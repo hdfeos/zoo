@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0" xmlns:xlink="http://www.w3.org/1999/xlink" 
+	 name="LP DAAC" version="1.0.1">
+  
+  <service name="all" base="" serviceType="compound">
+    <service name="odap" serviceType="OpenDAP" base="/thredds/dodsC/" />
+    <service name="http" serviceType="HTTPServer" base="/thredds/fileServer/" />
+    <service name="ncml" serviceType="NCML" base="/thredds/ncml/"/>
+    <service name="uddc" serviceType="UDDC" base="/thredds/uddc/"/>
+    <service name="iso" serviceType="ISO" base="/thredds/iso/"/>
+    <service name="wcs" serviceType="WCS" base="/thredds/wcs/" />
+    <service name="wms" serviceType="WMS" base="/thredds/wms/" />
+    <service name="ncss" serviceType="NetcdfSubset" base="/thredds/ncss/grid/"/>
+  </service>
+
+  <dataset name="LP DAAC">
+    <metadata inherited="true">
+      <serviceName>all</serviceName>
+      <dataFormat>HDF</dataFormat>
+    </metadata>
+
+    <dataset name="MCD">
+      <datasetScan name="GRID" ID="MCDGRID"
+                   path="MCDGRID" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="MCD43*.hdf" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+    </dataset>
+
+    <dataset name="MODIS Terra">
+      <datasetScan name="SWATH" ID="MODSWATH"
+                   path="MODSWATH" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="MOD11*L2*.hdf" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+      <datasetScan name="GRID" ID="MODGRID"
+                   path="MODGRID" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="MOD??C2*.hdf" />
+          <include wildcard="MOD09*.hdf" />
+          <include wildcard="MOD13A1*.hdf" />
+          <include wildcard="MOD43B4*.hdf" />
+          <include wildcard="MOD17A2*.hdf" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+
+    </dataset>
+
+    <dataset name="MODIS Aqua">
+      <datasetScan name="SWATH" ID="MODSWATH"
+                   path="MYDSWATH" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="MYD11*L2*.hdf" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+      <datasetScan name="GRID" ID="MYDGRID"
+                   path="MYDGRID" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="MYD??C2*.hdf" />
+          <include wildcard="MYD09*.hdf" />
+          <include wildcard="MYD13A1*.hdf" />
+          <include wildcard="MYD43B4*.hdf" />
+          <include wildcard="MYD17A2*.hdf" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+
+    </dataset>
+    <dataset name="GED">
+      <datasetScan name="GRID" ID="GEDGRID"
+                   path="GEDGRID" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="AGNS*.h5" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+    </dataset>
+
+  </dataset>
+</catalog>
+

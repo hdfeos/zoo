@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0" xmlns:xlink="http://www.w3.org/1999/xlink" 
+	 name="GHRC" version="1.0.1">
+  
+  <service name="all" base="" serviceType="compound">
+    <service name="odap" serviceType="OpenDAP" base="/thredds/dodsC/" />
+    <service name="http" serviceType="HTTPServer" base="/thredds/fileServer/" />
+    <service name="ncml" serviceType="NCML" base="/thredds/ncml/"/>
+    <service name="uddc" serviceType="UDDC" base="/thredds/uddc/"/>
+    <service name="iso" serviceType="ISO" base="/thredds/iso/"/>
+    <service name="wcs" serviceType="WCS" base="/thredds/wcs/" />
+    <service name="wms" serviceType="WMS" base="/thredds/wms/" />
+    <service name="ncss" serviceType="NetcdfSubset" base="/thredds/ncss/grid/"/>
+  </service>
+
+  <dataset name="GHRC">
+    <metadata inherited="true">
+      <serviceName>all</serviceName>
+      <dataFormat>HDF</dataFormat>
+    </metadata>
+
+    <dataset name="AMSR2">
+      <datasetScan name="SWATH" ID="AMSR2"
+                   path="AMSR2" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="AMSR_2_L2_RainOcean_R00_201504270033_D.*5" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+    </dataset>
+  </dataset>
+</catalog>
+

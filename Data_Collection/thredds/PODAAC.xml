@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0" xmlns:xlink="http://www.w3.org/1999/xlink" 
+	 name="PO.DAAC" version="1.0.1">
+  
+  <service name="all" base="" serviceType="compound">
+    <service name="odap" serviceType="OpenDAP" base="/thredds/dodsC/" />
+    <service name="http" serviceType="HTTPServer" base="/thredds/fileServer/" />
+    <service name="ncml" serviceType="NCML" base="/thredds/ncml/"/>
+    <service name="uddc" serviceType="UDDC" base="/thredds/uddc/"/>
+    <service name="iso" serviceType="ISO" base="/thredds/iso/"/>
+    <service name="wcs" serviceType="WCS" base="/thredds/wcs/" />
+    <service name="wms" serviceType="WMS" base="/thredds/wms/" />
+    <service name="ncss" serviceType="NetcdfSubset" base="/thredds/ncss/grid/"/>
+  </service>
+
+  <dataset name="PO.DAAC">
+    <metadata inherited="true">
+      <serviceName>all</serviceName>
+      <dataFormat>HDF</dataFormat>
+    </metadata>
+    <dataset name="Aquarius">
+      <datasetScan name="SWATH" ID="AQUARIUSWATH"
+                   path="AQUARIUSWATH" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="Q2011*L2*.h5" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+
+      <datasetScan name="GRID" ID="AQUARIUSGRID"
+                   path="AQUARIUSGRID" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="Q2012*L3*.h5" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+    </dataset>
+  </dataset>
+</catalog>
+

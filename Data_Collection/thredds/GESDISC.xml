@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog xmlns="http://www.unidata.ucar.edu/namespaces/thredds/InvCatalog/v1.0" xmlns:xlink="http://www.w3.org/1999/xlink" 
+	 name="GES DISC" version="1.0.1">
+  
+  <service name="all" base="" serviceType="compound">
+    <service name="odap" serviceType="OpenDAP" base="/thredds/dodsC/" />
+    <service name="http" serviceType="HTTPServer" base="/thredds/fileServer/" />
+    <service name="ncml" serviceType="NCML" base="/thredds/ncml/"/>
+    <service name="uddc" serviceType="UDDC" base="/thredds/uddc/"/>
+    <service name="iso" serviceType="ISO" base="/thredds/iso/"/>
+    <service name="wcs" serviceType="WCS" base="/thredds/wcs/" />
+    <service name="wms" serviceType="WMS" base="/thredds/wms/" />
+    <service name="ncss" serviceType="NetcdfSubset" base="/thredds/ncss/grid/"/>
+  </service>
+
+  <dataset name="GES DISC">
+    <metadata inherited="true">
+      <serviceName>all</serviceName>
+      <dataFormat>HDF</dataFormat>
+    </metadata>
+    <dataset name="AIRS">
+      <datasetScan name="SWATH" ID="AIRSSWATH"
+                   path="AIRSSWATH" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="AIRS*L2*.*" />
+          <include wildcard="AIRS*L1*.*" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+
+      <datasetScan name="GRID" ID="AIRSGRID"
+                   path="AIRSGRID" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="AIRS*L3*.hdf" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+    </dataset>
+
+    <dataset name="TRMM">
+      <datasetScan name="SWATH" ID="TRMMSWATH"
+                   path="TRMMSWATH" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="1A*.HDF" />
+          <include wildcard="1B*.HDF" />
+          <include wildcard="2B*.HDF" />
+          <include wildcard="2B*.HDF" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+      <datasetScan name="GRID" ID="TRMMGRID"
+                   path="TRMMGRID" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="3A*.HDF" />
+          <include wildcard="3B*.HDF" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+    </dataset>
+
+    <dataset name="BUV">
+      <datasetScan name="ZA" ID="BUVZA"
+                   path="BUVZA" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="BUV*L3zm*.h5" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+    </dataset>
+
+    <dataset name="SBUV">
+      <datasetScan name="SWATH" ID="SBUVSWATH"
+                   path="SBUVSWATH" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="SBUV*.h5" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+    </dataset>
+
+    <dataset name="SWDB">
+      <datasetScan name="SWATH" ID="SWDBSWATH"
+                   path="SWDBSWATH" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="DeepBlue*L2*.h5" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+      <datasetScan name="GRID" ID="SWDBGRID"
+                   path="SWDBGRID" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="DeepBlue*L3*.h5" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+    </dataset>
+
+
+    <dataset name="GOZCARDS">
+      <datasetScan name="ZA" ID="GOZCARDSZA"
+                   path="GOZCARDSZA" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="GOZ*.nc4" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+    </dataset>
+
+    <dataset name="GPM">
+      <datasetScan name="SWATH" ID="GPMSWATH"
+                   path="GPMSWATH" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="2*GPM*.HDF5" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+      <datasetScan name="GRID" ID="GPMGRID"
+                   path="GPMGRID" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="3*IMERG*.HDF5" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+    </dataset>
+
+    <dataset name="OCO-2">
+      <datasetScan name="SWATH" ID="OCO2SWATH"
+                   path="OCO2SWATH" location="content/testdata/NASAHDF/"
+                   harvest="true">
+	<filter>
+          <include wildcard="oco*.h5" />
+	</filter>
+	<addID/>
+	<sort>
+          <lexigraphicByName increasing="true"/>
+	</sort>
+	<addLatest/>
+	<addDatasetSize/>
+      </datasetScan>
+    </dataset>
+
+  </dataset>
+</catalog>
+
