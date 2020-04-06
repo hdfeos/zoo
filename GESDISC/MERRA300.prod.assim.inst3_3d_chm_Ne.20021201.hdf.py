@@ -19,7 +19,7 @@ Usage:  save this script and run
 The HDF file must be in your current working directory.
 
 Tested under: Python 3.7.3 :: Anaconda
-Last updated: 2020-3-19
+Last updated: 2020-4-06
 """
 import os
 import numpy as np
@@ -64,23 +64,32 @@ def write_netcdf4(_fname, _lat, _lon, _data, _varname, _long_name, _units):
     ncout.close()
 
 def write_hdf(_fname, _lat, _lon, _data, _var_name, _long_name, _units):
-
     # Create file.
     d = SD(_fname, SDC.WRITE|SDC.CREATE) 
 
     # Create lat.
     nlat = len(_lat)
-    lat = d.create('lat',SDC.FLOAT64, nlat)
+    lat = d.create('lat', SDC.FLOAT64, nlat)
+    d0 = lat.dim(0)
+    d0.setname('YDim:EOSGRID')
     lat[:] = _lat
-
+    setattr(lat, 'units', 'degrees_north')
+    
     # Create lon
     nlon = len(_lon)    
-    lon = d.create('lat',SDC.FLOAT64, nlon)
+    lon = d.create('lon', SDC.FLOAT64, nlon)
+    d1 = lon.dim(0)    
+    d1.setname('XDim:EOSGRID')
     lon[:] = _lon
+    setattr(lon, 'units', 'degrees_east')
     
     # Create var.
-    v = d.create(_var_name,SDC.FLOAT64,(nlat, nlon))
-    v[:] = _data
+    v = d.create(_var_name, SDC.FLOAT64, (nlat, nlon))
+    v0 = v.dim(0)
+    v1 = v.dim(1)
+    v0.setname('YDim:EOSGRID')
+    v1.setname('XDim:EOSGRID')
+    v[:] = _data    
     setattr(v, 'long_name', _long_name)
     setattr(v, 'units', _units)
 
