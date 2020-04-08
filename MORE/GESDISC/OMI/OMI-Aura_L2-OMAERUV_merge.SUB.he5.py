@@ -18,7 +18,7 @@ Usage:  save this script and run
 The HDF5 files must be in your current working directory.
 
 Tested under: Python 3.7.3 :: Anaconda
-Last updated: 2020-3-19
+Last updated: 2020-4-8
 """
 
 import glob
@@ -84,11 +84,14 @@ def write_geotiff(lonm, latm, datam, FILE_NAME):
     
 OLD_FILE_NAME = None
 i = 0
-for file in sorted(glob.glob('OMI-Aura_L2-OMAERUV*.he5')):
+j = 0
+lst = sorted(glob.glob('OMI-Aura_L2-OMAERUV*.he5'))
+k = len(lst)
+for file in lst:
     FILE_NAME =  file
-
+    j = j + 1
     if OLD_FILE_NAME:
-        new_date = is_new_date(FILE_NAME, OLD_FILE_NAME);
+        new_date = is_new_date(FILE_NAME, OLD_FILE_NAME)
     else:
         new_date = False;
         
@@ -125,7 +128,7 @@ for file in sorted(glob.glob('OMI-Aura_L2-OMAERUV*.he5')):
         lon[lon == missing_value] = np.nan
         lonm = np.ma.masked_where(np.isnan(lon), lon)
 
-        if new_date:
+        if new_date or j == k:
             # Convert data into GeoTIFF using pyresample.
             write_geotiff(lon_m, lat_m, data_m, FILE_NAME)
             i = 0
