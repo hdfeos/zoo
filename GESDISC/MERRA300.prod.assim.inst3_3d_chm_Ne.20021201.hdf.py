@@ -19,7 +19,7 @@ Usage:  save this script and run
 The HDF file must be in your current working directory.
 
 Tested under: Python 3.7.3 :: Anaconda
-Last updated: 2020-4-06
+Last updated: 2020-4-08
 """
 import os
 import numpy as np
@@ -89,7 +89,8 @@ def write_hdf(_fname, _lat, _lon, _data, _var_name, _long_name, _units):
     v1 = v.dim(1)
     v0.setname('YDim:EOSGRID')
     v1.setname('XDim:EOSGRID')
-    v[:] = _data    
+    v[:] = _data
+    v.setcompress(SDC.COMP_DEFLATE, 5)    
     setattr(v, 'long_name', _long_name)
     setattr(v, 'units', _units)
 
