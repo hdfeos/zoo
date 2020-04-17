@@ -2,8 +2,8 @@
 Copyright (C) 2014-2020 The HDF Group
 Copyright (C) 2014 John Evans
 
-This example code illustrates how to access and visualize a NSIDC Level-2
-MODIS Grid file in Python.
+This example code illustrates how to access and visualize a NSIDC 
+MOD10A1 L3 HDF-EOS2 Sinusoidal Grid file in Python.
 
 If you have any questions, suggestions, or comments on this example, please use
 the HDF-EOS Forum (http://hdfeos.org/forums).  If you would like to see an
@@ -14,12 +14,12 @@ contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS Forum
 
 Usage:  save this script and run
 
-    $python MOD10A1.A2000055.h27v12.061.2020037172355.hdf.py
+    $python MOD10A1.A2003062.h10v03.061.2020087120849.hdf.py
 
  The HDF file must be in your current working directory.
 
 Tested under: Python 3.7.3 :: Anaconda custom (64-bit)
-Last updated: 2020-03-26
+Last updated: 2020-04-14
 """
 
 import os
@@ -29,9 +29,8 @@ import pyproj
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-
 from mpl_toolkits.basemap import Basemap
-
+    
 USE_GDAL = False
 
 def run(FILE_NAME):
@@ -110,43 +109,64 @@ def run(FILE_NAME):
     sinu = pyproj.Proj("+proj=sinu +R=6371007.181 +nadgrids=@null +wktext")
     wgs84 = pyproj.Proj("+init=EPSG:4326") 
     lon, lat= pyproj.transform(sinu, wgs84, xv, yv)
-    min_lon = np.min(lon)
-    max_lon = np.max(lon)
-    min_lat = np.min(lat)
-    max_lat = np.max(lat)
-    mid_lon = (max_lon - min_lon) / 2.0
+
     # There's a wraparound issue for the longitude, as part of the tile extends
     # over the international dateline, and pyproj wraps longitude values west
     # of 180W (< -180) into positive territory.  Basemap's pcolormesh method
     # doesn't like that.
-    lon[lon > 0] -= 360
-    
-    m = Basemap(projection='cyl', 
-                lon_0=mid_lon,
-                llcrnrlat=min_lat, urcrnrlat = max_lat,
-                llcrnrlon=min_lon, urcrnrlon = max_lon)                
-    m.drawcoastlines(linewidth=0.5)
-    m.drawparallels(np.arange(min_lat, max_lat, 5), labels=[1, 0, 0, 0])
-    m.drawmeridians(np.arange(min_lon, max_lon, 30), labels=[0, 0, 0, 1])    
+    # lon[lon > 0] -= 360
+    # lon[lon < 0] += 180
+    print(lon)
+    # Check latitude bounds.
+    min_lat = np.min(lat)
+    print(min_lat)
+    max_lat = np.max(lat)
+    print(max_lat)
 
-    # Use a discretized colormap since we have only four levels.
-    #  missing, ocean, fill
-    cmap = mpl.colors.ListedColormap(['grey',  'blue', 'black'])
-    # bounds = [0, 239, 255, 256]
-    # bounds = [0, 238, 254, 256]
-    bounds = [238, 254, 256]
-    norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+    min_lon = np.min(lon)
+    print(min_lon)
+    max_lon = np.max(lon)
+    print(max_lon)
+    # If both are negative, use addition.
+    lon_m = (max_lon + min_lon) / 2.0
+    print(lon_m)
+    # Count the number of ocean and cloud data points to validate plot.
     print(np.histogram(data))
-    # 2400x2400 seems to be too much, so we'll subset it.
-    step = 5
+    # You can use sinusoidal Basemap here but the image will be too small.
+    # Sinusoidal map desn't allow lat/lon limits to have zoom-in effect.
+    # Thus, we will use North Polar stereo.
+    # Bounding latitude should be minimum latitude value.
+    m = Basemap(projection='npstere', resolution='l', boundinglat=min_lat,
+               lon_0=lon_m)
+    # m = Basemap(projection='sinu', lon_0=lon_m)
+    #m = Basemap(projection='cyl', resolution='l',
+    #            llcrnrlat=-90, urcrnrlat = 90,
+    #            llcrnrlon=-180, urcrnrlon = 180)
+    m.drawcoastlines(linewidth=0.5)
+    m.drawparallels(np.arange(0, 91, 20), labels=[1, 0, 0, 0])
+    m.drawmeridians(np.arange(-180, 180, 30), labels=[0, 0, 0, 1])
+    # Key :
+    # 0-100=NDSI snow, 200=missing data, 201=no decision, 211=night,
+    # 237=inland water, 239=ocean, 250=cloud, 254=detector saturated,
+    # 255=fill
+    # Use a discretized colormap. See [1] for color names.
+    cmap = mpl.colors.ListedColormap(['lightgrey', 'red', 'orange', 'black',
+                                      'blue', 'darkblue', 'yellow', 'green',
+                                      'violet'])
+    bounds = [100, 200, 201, 211, 237, 239, 250, 254, 255, 256]
+    norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+    # 2400x2400 seems to be too big, so we'll subset it.
+    # If step is too small, you may not see any data.
+    step = 10
     m.pcolormesh(lon[::step,::step], lat[::step,::step], data[::step,::step],
-                 latlon=True, cmap=cmap, norm=norm)
-    
+                 latlon=True,
+                 cmap=cmap, norm=norm)
     color_bar = plt.colorbar()
-    color_bar.set_ticks([120, 247, 255.5])
-    color_bar.set_ticklabels(['missing', 'ocean', 'fill'])
+    color_bar.set_ticks([50, 150, 200.5, 205, 224, 238, 245, 252, 254.5, 255.5])
+    color_bar.set_ticklabels(['snow', 'missing', 'no', 'night',
+                              'water', 'ocean', 'cloud', 'saturated',
+                              'fill'])
     color_bar.draw_all()
-
     basename = os.path.basename(FILE_NAME)
     plt.title('{0}\n{1}'.format(basename, long_name))
     fig = plt.gcf()
@@ -155,6 +175,8 @@ def run(FILE_NAME):
 
 
 if __name__ == "__main__":
-    hdffile = 'MOD10A1.A2000055.h27v12.061.2020037172355.hdf'
+    hdffile = 'MOD10A1.A2003062.h10v03.061.2020087120849.hdf'
     run(hdffile)
     
+# Reference
+# [1] https://matplotlib.org/3.1.0/gallery/color/named_colors.html

@@ -2,8 +2,8 @@
 Copyright (C) 2014-2020 The HDF Group
 Copyright (C) 2014 John Evans
 
-This example code illustrates how to access and visualize a NSIDC Level-2
-MODIS HDF-EOS2 Swath data file in Python.
+This example code illustrates how to access and visualize a NSIDC 
+MOD10 Level 2 HDF-EOS2 Swath data file in Python.
 
 If you have any questions, suggestions, or comments on this example, please use
 the HDF-EOS Forum (http://hdfeos.org/forums).  If you would like to see an
@@ -14,12 +14,12 @@ contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS Forum
 
 Usage:  save this script and run
 
-    $python MOD10_L2.A2000243.2355.061.2020050185037.hdf.py
+    $python MOD10_L2.A2003313.0610.061.2020105103247.hdf.py
 
 The HDF file must be in your current working directory.
 
 Tested under: Python 3.7.3 :: Anaconda (64-bit)
-Last updated: 2020-04-14
+Last updated: 2020-04-15
 """
 
 import os
@@ -72,8 +72,8 @@ def run(FILE_NAME):
     print(lon_m)
     
     # Draw a polar stereographic projection using the low resolution coastline
-    # database.
-    m = Basemap(projection='npstere', resolution='l', boundinglat=min_lat,
+    # database. Use max_lat for southern hemisphere and max_min for northern.
+    m = Basemap(projection='spstere', resolution='l', boundinglat=max_lat,
                 lon_0=lon_m)
     m.drawcoastlines(linewidth=0.5)
     m.drawparallels(np.arange(min_lat, max_lat, 10.), labels=[1,0,0,0])
@@ -122,6 +122,6 @@ if __name__ == "__main__":
 
     # If a certain environment variable is set, look there for the input
     # file, otherwise look in the current directory.
-    hdffile = 'MOD10_L2.A2000243.2355.061.2020050185037.hdf'
+    hdffile = 'MOD10_L2.A2003313.0610.061.2020105103247.hdf'
     run(hdffile)
     
