@@ -1,4 +1,4 @@
-This folder has gdalmdimtranslate examples for [NASA EED2 Innovation Challenge Program](https://bugs.earthdata.nasa.gov/browse/ICP-2).
+This folder has gdalmdimtranslate examples for [NASA EED2 Innovation Challenge Prototype](https://bugs.earthdata.nasa.gov/browse/ICP-2).
 
 # How to contribute
 
