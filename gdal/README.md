@@ -13,6 +13,6 @@ This folder has gdalmdimtranslate examples for [NASA EED2 Innovation Challenge P
 
 | NASA Data Center | Product | Type | Parameters | GeoTIFF | Plot | Note |
 |------------------|---------|------|------------|---------|------|------|
-| GES DISC | AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf | Swath | -array  | n/a | n/a | Swath can't be handled. |
+| GES DISC | AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf | Swath | -array "name=/swaths/L2_Standard_atmospheric&surface_product/Data Fields/topog" | AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf.tif | n/a | Swath can't be handled with geo-location information. It's just good for quick preview of data.|
 
 
