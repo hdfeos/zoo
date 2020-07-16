@@ -2,7 +2,7 @@ This folder has gdalmdimtranslate examples.
 
 # How to contribute
 
-1. Download a sample file from [http://hdfeos.org/zoo|zoo].
+1. Download a sample file from [zoo](http://hdfeos.org/zoo).
 2. Run gdalmdiminfo.
 3. Run gdalmdimtranslate to generate GeoTIFF. Use filename.tif for file name.
 4. Test GeoTIFF with either ArcGIS Pro or QGIS.
