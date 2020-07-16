@@ -11,6 +11,7 @@ This folder has gdalmdimtranslate examples.
 
 # Table
 
-| NASA Data Center | Product | Type | Param | GeoTIFF | Plot | Note |
-|----|----|----|-----|----|----|----|----|
-| GES DISC | AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf | Swath | | | | | 
+| NASA Data Center | Product | Type | Parameters | GeoTIFF | Plot | Note |
+|------------------|---------|------|------------|---------|------|------|
+| GES DISC | AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf | Swath | -array  | AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf.tif | QGIS | n/a |
+
