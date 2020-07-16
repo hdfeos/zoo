@@ -2,9 +2,10 @@ This folder has gdalmdimtranslate examples for [NASA EED2 Innovation Challenge P
 
 # How to contribute
 
+0. Install [miniconda3](https://docs.conda.io/en/latest/miniconda.html) and use ```mconda3>conda install -c conda-forge gdal``` to install the latest GDAL 3.1.0 (or above) command line tools.
 1. Download a sample file from [zoo](http://hdfeos.org/zoo).
-2. Run gdalmdiminfo. Use ```mconda3>conda install -c conda-forge gdal``` to install the latest GDAL 3.1.0 (or above) command line tools.
-3. Run gdalmdimtranslate with *-array* parameter that corresponds to dataset in [zoo](http://hdfeos.org/zoo) to generate GeoTIFF. Use filename.tif for file name.
+2. Run *gdalmdiminfo sample.hdf > output.txt* to identify group and dataset. 
+3. Run *gdalmdimtranslate* with *-array* parameter that corresponds to **/group/dataset** in [zoo](http://hdfeos.org/zoo) to generate GeoTIFF. Use filename.tif for file name.
 4. Test GeoTIFF with either ArcGIS Pro or QGIS.
 5. Update the table in the README with the parameters used, upload the converted GeoTIFF and its screenshot. Use filename.png for screenshot file name.
 6. Add a note that help NASA Earthdata users.
