@@ -14,6 +14,7 @@ This folder has gdalmdimtranslate examples for [NASA EED2 Innovation Challenge P
 
 | NASA Data Center | Product | Type | Parameters | Output | Plot | Note |
 |------------------|---------|------|------------|--------|------|------|
-| GES DISC | [AIRS](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf) | Swath | -array "name=/swaths/L2_Standard_atmospheric&surface_product/Data Fields/topog" | [GeoTIFF](AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf.tif) | n/a | It throws an error message: ```ERROR 1: An attribute with same name already exists```. Swath can't be handled with geo-location information. It's just good for quick preview of data.|
+| GES DISC | [AIRS](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf) | Swath | -array "name=/swaths/L2_Standard_atmospheric&surface_product/Data Fields/topog" | [GeoTIFF](AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf.tif) | n/a | It throws an error message: ```ERROR 1: An attribute with same name already exists```. Swath can't be handled with geo-location information. It's good for quick preview of data.|
+| GES DISC | [AIRS](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/AIRS.2003.02.05.L3.RetStd_H001.v6.0.12.0.G14112124328.hdf) | Grid | -array "name=" | [GeoTIFF]() | n/a | n/a|
 
 
