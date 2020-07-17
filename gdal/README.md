@@ -16,7 +16,7 @@
 6. Add a note that help NASA Earthdata users.
 
 # Table
-  Although AIRS is an HDF-EOS product and can be handled by **gdal_translate**, it is given as the first exampleto match the main  [zoo](http://hdfeos.org/zoo) table.
+  Although AIRS is an HDF-EOS product and can be handled by **gdal_translate**, it is given as the first example to match the main  [zoo](http://hdfeos.org/zoo) table.
 | NASA Data Center | Product | Type | Parameters | Output | Plot | Note |
 |------------------|---------|------|------------|--------|------|------|
 | GES DISC | [AIRS](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf) | Swath | -array "name=/swaths/L2_Standard_atmospheric&surface_product/Data Fields/topog" | [GeoTIFF](AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf.tif) | n/a | It throws an error message: ```ERROR 1: An attribute with same name already exists```. Geo-location information can't be handled properly. Use gdal_translate.|
