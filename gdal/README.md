@@ -22,6 +22,7 @@
 | GES DISC | [AIRS](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf) | Swath | -array "name=/swaths/L2_Standard_atmospheric&surface_product/Data Fields/topog" | [GeoTIFF](AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf.tif) | n/a | It throws an error message: ```ERROR 1: An attribute with same name already exists```. Geo-location information can't be handled properly. Use gdal_translate.|
 | GES DISC | [3A26](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/3A26.20140101.7.HDF) | Grid | -array "name=" | [GeoTIFF]() | n/a | Generic HDF4 and 3D|
 | GES DISC | [MAI3NECHM_5.2.0](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/MERRA300.prod.assim.inst3_3d_chm_Ne.20021201.hdf)| Grid | | | | Generic HDF4 and 4D |
+| GES DISC | [H3ZFCNO2_007](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/HIRDLS-Aura_L3ZFCNO2_v07-00-20-c01_2005d022-2008d077.he5)| ZA | | | |HE5 and 4D |
 
 
 
