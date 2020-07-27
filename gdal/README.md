@@ -2,8 +2,8 @@
 
  This folder has **gdalmdimtranslate** examples for [NASA EED2 Innovation Challenge Prototype](https://bugs.earthdata.nasa.gov/browse/ICP-2). The **gdalmdimtranslate** is a new GDAL command line tool that can handle multi-dimenstional dataset and transpose data.  During the first round of challenge, we're mainly interested in testing the following products that meet the following creteria:
  
-  * non HDF-EOS data products such as generic HDF4/HDF5/netCDF-4 data product.
-  * Dataset that requires subsetting - 3 or more dimension dataset.
+  * Non HDF-EOS data products such as generic HDF4/HDF5/netCDF-4 data product
+  * Dataset that requires subsetting - 3 or more dimension dataset
 
 # How to contribute
 
