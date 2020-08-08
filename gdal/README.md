@@ -23,6 +23,5 @@
 | GES DISC | [3A26](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/3A26.20140101.7.HDF) | Grid | -array "name=/scientific_datasets/rainMeanTH,transpose=[0,2,1]" | [GeoTIFF](3A26.20140101.7.HDF.tif) | [QGIS](3A26.20140101.7.HDF.qgis.png) | Generic HDF4 and 3D. Subset with ```view=[0,:,:]``` doesn't work. Use ```gdaltranslate -b``` option.|
 | GES DISC | [MAI3NECHM_5.2.0](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/MERRA300.prod.assim.inst3_3d_chm_Ne.20021201.hdf)| Grid | | | | Generic HDF4 and 4D |
 | GES DISC | [H3ZFCNO2_007](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/HIRDLS-Aura_L3ZFCNO2_v07-00-20-c01_2005d022-2008d077.he5)| ZA | | | |HE5 and 4D |
-
-
+| LAADS | [MOD35_L2](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/MORE/LAADS/MOD/MOD35_L2.A2017060.1010.006.2017060203649.hdf)| Swath |  -array "name=/swaths/mod35/Data Fields/Quality_Assurance,transpose=[2,1,0]" | [GeoTIFF](MOD35_L2.A2017060.1010.006.2017060203649.hdf.tif) | QGIS |   ```ERROR 1: An attribute with same name already exists``` |
 
