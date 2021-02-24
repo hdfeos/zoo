@@ -24,4 +24,5 @@
 | GES DISC | [MAI3NECHM_5.2.0](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/MERRA300.prod.assim.inst3_3d_chm_Ne.20021201.hdf)| Grid | | | | Generic HDF4 and 4D |
 | GES DISC | [H3ZFCNO2_007](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/HIRDLS-Aura_L3ZFCNO2_v07-00-20-c01_2005d022-2008d077.he5)| ZA | | | |HE5 and 4D |
 | LAADS | [MOD35_L2](https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/MORE/LAADS/MOD/MOD35_L2.A2017060.1010.006.2017060203649.hdf)| Swath |  -array "name=/swaths/mod35/Data Fields/Quality_Assurance,transpose=[2,1,0]" | [GeoTIFF](MOD35_L2.A2017060.1010.006.2017060203649.hdf.tif) | QGIS | It throws an error message:  ```ERROR 1: An attribute with same name already exists```. **The generated GeoTIFF file has no data.**|
+| NSIDC | [AU_Land](https://nsidc.org/data/AU_Land/versions/1)|Swath| -array "name=/HDFEOS/POINTS/AMSR-2 Level 2 Land Data/Data/Combined NPD and SCA Output Fields/"  |n/a |n/a| [StackOverflow](https://stackoverflow.com/questions/62900396/gdalmdimtranslate-hdf5-file-with-components) |
 
