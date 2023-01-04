@@ -42,7 +42,7 @@ jobs:
           wget https://downloads.unidata.ucar.edu/netcdf-c/4.9.0/netcdf-c-4.9.0.tar.gz
           tar zxvf netcdf-c-4.9.0.tar.gz
           cd netcdf-c-4.9.0
-          ./configure --enable-hdf4 --disable-hdf5
+          ./configure --enable-hdf4 --disable-netcdf-4
           make
           sudo make install
           ls /usr/local/lib
