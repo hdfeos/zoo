@@ -36,6 +36,7 @@ jobs:
           install.packages('RNetCDF')
           install.packages('fields')
           install.packages('sp')
+          install.packages('raster')          
           remotes::install_deps(dependencies = TRUE)
         shell: Rscript {0}
       - name: Generate data
