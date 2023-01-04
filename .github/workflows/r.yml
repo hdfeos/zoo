@@ -34,7 +34,8 @@ jobs:
         run: |
           install.packages('remotes')
           install.packages('RNetCDF')
-          install.packages('fields')          
+          install.packages('fields')
+          install.packages('maptools')          
           remotes::install_deps(dependencies = TRUE)
         shell: Rscript {0}
       - name: Generate data
