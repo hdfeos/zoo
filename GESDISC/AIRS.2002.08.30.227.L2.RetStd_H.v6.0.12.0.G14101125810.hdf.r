@@ -20,8 +20,8 @@
 # Last updated: 2016-11-22
 library(fields)
 library(maps)
-library(maptools)
-library(ncdf4)
+library(sp)
+library(RNetCDF)
 library(raster)
 library(ggmap)
 library(akima)
