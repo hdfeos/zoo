@@ -29,7 +29,7 @@ jobs:
       - name: Install HDF4
         run: |
           sudo apt-get update -q -y
-          sudo apt-get install -q -y libtirpc-common libtirpc-dev libtirpc3 libnsl-dev
+          sudo apt-get install -q -y libtirpc-common libtirpc-dev libtirpc3 libnsl-dev libhdf5-dev
           wget https://support.hdfgroup.org/ftp/HDF/releases/HDF4.2.15/src/hdf-4.2.15.tar.gz
           tar zxvf hdf-4.2.15.tar.gz
           cd hdf-4.2.15
