@@ -1,7 +1,4 @@
-# Copyright (C) 2016 by The HDF Group.
-#  All rights reserved.
-#
-# This example code illustrates how to access and visualize GESDISC AIRS Swath
+# This example code illustrates how to access and visualize GES DISC AIRS Swath
 # in R.
 #
 # If you have any questions, suggestions, comments  on this example, please 
@@ -16,8 +13,9 @@
 #
 # $Rscript AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf.r
 #
-# Tested under: R 3.3.1
-# Last updated: 2016-11-22
+# Tested under: R 4.2.2
+# Last updated: 2023-01-04
+
 library(fields)
 library(maps)
 library(sp)
@@ -26,7 +24,6 @@ library(raster)
 library(ggmap)
 library(akima)
 library(reshape)
-data(wrld_simpl)
 
 # Download file.
 options(timeout=120)
