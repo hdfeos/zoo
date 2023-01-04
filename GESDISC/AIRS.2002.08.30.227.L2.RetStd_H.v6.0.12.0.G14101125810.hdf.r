@@ -30,9 +30,10 @@ data(wrld_simpl)
 
 # Open file.
 fname <- 'AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf'
-nc <- nc_open(fname)
-v1 <- nc$var[['topog']]
-z_all <- ncvar_get(nc, v1)
+nc <- open.nc(fname)
+print.nc(nc)
+nc_data <- read.nc(nc)
+z_all <- nc_data$topog
 zv <- as.vector(as.single(z_all))
 zz <- file("tmpbin", "wb")
 writeBin(zv, zz)
@@ -43,8 +44,8 @@ close(zz2)
 dim(zs) <- dim(z_all)
 b <- zs[,]
 b[b == -9999.0] <- NA
-lat <- ncvar_get(nc, 'Latitude')
-lon <- ncvar_get(nc, 'Longitude')
+lat <- nc_data$Latitude
+lon <- nc_data$Longitude
 remap.tbl <- data.frame(coordinates(lon),
                         lon=as.vector(lon),lat=as.vector(lat))
 df <- data.frame(lon=as.vector(lon), lat=as.vector(lat), rad=as.vector(b))
