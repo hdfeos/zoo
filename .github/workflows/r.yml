@@ -28,10 +28,11 @@ jobs:
       - uses: actions/checkout@v3
       - name: Install HDF4
         run: |
+          apt-get install -q -y libtirpc-common libtirpc-dev libtirpc3
           wget https://support.hdfgroup.org/ftp/HDF/releases/HDF4.2.15/src/hdf-4.2.15.tar.gz
           tar zxvf hdf-4.2.15.tar.gz
           cd hdf-4.2.15
-          ./configure --disable-netcdf --disable-fortran --enable-hdf4-xdr
+          ./configure --disable-netcdf --disable-fortran
           make
           sudo make install
           ls /usr/local/lib
