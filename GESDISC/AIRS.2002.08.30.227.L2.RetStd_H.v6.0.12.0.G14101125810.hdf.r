@@ -28,6 +28,9 @@ library(akima)
 library(reshape)
 data(wrld_simpl)
 
+# Download file.
+download.file("https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/AIRS.2003.02.05.L3.RetStd_H001.v6.0.12.0.G14112124328.hdf", "AIRS.2003.02.05.L3.RetStd_H001.v6.0.12.0.G14112124328.hdf")
+
 # Open file.
 fname <- 'AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf'
 nc <- open.nc(fname)
