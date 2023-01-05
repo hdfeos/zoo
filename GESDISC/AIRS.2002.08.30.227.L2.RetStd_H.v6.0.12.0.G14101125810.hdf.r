@@ -14,16 +14,18 @@
 # $Rscript AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf.r
 #
 # Tested under: R 4.2.2
-# Last updated: 2023-01-04
+# Last updated: 2023-01-05
+
 
 library(fields)
 library(maps)
 library(sp)
+library(mapproj)
 library(RNetCDF)
-library(raster)
 library(ggmap)
 library(akima)
 library(reshape)
+
 
 # Download file.
 options(timeout=120)
@@ -50,20 +52,20 @@ mapWorld <- borders("world")
 wd <- map_data("world")
 ggplot() +
  mapWorld  +
- scale_colour_gradient2(name = "topog", low="blue", mid="green", high="red", na.value="white", midpoint=60) # +
-# geom_point(data = df, aes(x = lon, y = lat, colour=rad), na.rm=TRUE) +
-# ggtitle(fname) +
-# ylab("Latitude") +
-# xlab("Longitude") +
-# theme_linedraw() +
-# theme(plot.title = element_text(size = 15, face = "bold"),
-# legend.title = element_text(size = 15),
-# axis.text = element_text(size = 15),
-# axis.text.x = element_blank(),
-# axis.title.x = element_blank(),
-# axis.title.y = element_text(size = 20, vjust = 0.2),
-# legend.text = element_text(size = 10)) +
-# coord_map("stereographic", orientation=c(90, 0,0), ylim=c(90, 60))
+ scale_colour_gradient2(name = "topog", low="blue", mid="green", high="red", na.value="white", midpoint=60)  +
+ geom_point(data = df, aes(x = lon, y = lat, colour=rad), na.rm=TRUE) +
+ ggtitle(fname) +
+ ylab("Latitude") +
+ xlab("Longitude") +
+ theme_linedraw() +
+ theme(plot.title = element_text(size = 15, face = "bold"),
+ legend.title = element_text(size = 15),
+ axis.text = element_text(size = 15),
+ axis.text.x = element_blank(),
+ axis.title.x = element_blank(),
+ axis.title.y = element_text(size = 20, vjust = 0.2),
+ legend.text = element_text(size = 10)) +
+ coord_map("stereographic", orientation=c(90, 0,0), ylim=c(90, 60))
 dev.off()
 close.nc(nc)
 print(getwd())
