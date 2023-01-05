@@ -34,32 +34,23 @@ fname <- 'AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf'
 nc <- open.nc(fname)
 # print.nc(nc)
 nc_data <- read.nc(nc)
-print(nc_data)
-z_all <- nc_data$topog
-zv <- as.vector(as.single(z_all))
-zz <- file("tmpbin", "wb")
-writeBin(zv, zz)
-close(zz)
-zz2 <- file("tmpbin", "rb")
-zs <- readBin(zz2, numeric(), size=4, length(zv), endian="little")
-close(zz2)
-dim(zs) <- dim(z_all)
-b <- zs[,]
+# print(nc_data)
+b <- nc_data$topog
+print(b)
 b[b == -9999.0] <- NA
 lat <- nc_data$Latitude
 print(lat)
 lon <- nc_data$Longitude
 print(lon)
 remap.tbl <- data.frame(coordinates(lon),
-                        lon=as.vector(lon),lat=as.vector(lat))
-print(b)
+                         lon=as.vector(lon),lat=as.vector(lat))
 df <- data.frame(lon=as.vector(lon), lat=as.vector(lat), rad=as.vector(b))
 png(paste(fname, ".r.png", sep=""), width=640, height=480)
-# mapWorld <- borders("world") 
+mapWorld <- borders("world") 
 wd <- map_data("world")
-ggplot() # +
-# mapWorld +
-# scale_colour_gradient2(name = "topog", low="blue", mid="green", high="red", na.value="white", midpoint=60) +
+ggplot() +
+ mapWorld  +
+ scale_colour_gradient2(name = "topog", low="blue", mid="green", high="red", na.value="white", midpoint=60) # +
 # geom_point(data = df, aes(x = lon, y = lat, colour=rad), na.rm=TRUE) +
 # ggtitle(fname) +
 # ylab("Latitude") +
