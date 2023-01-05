@@ -71,5 +71,5 @@ legend.text = element_text(size = 10)) +
 coord_map("stereographic", orientation=c(90, 0,0), ylim=c(90, 60))
 dev.off()
 close.nc(nc)
-getwd()
-list.files('.')
+print(getwd())
+print(list.files('.'))
