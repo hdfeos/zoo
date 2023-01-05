@@ -50,7 +50,8 @@ df <- data.frame(lon=as.vector(lon), lat=as.vector(lat), rad=as.vector(b))
 png(paste(fname, ".r.png", sep=""), width=640, height=480)
 mapWorld <- borders("world") 
 wd <- map_data("world")
-ggplot() +
+p =
+ ggplot() +
  mapWorld  +
  scale_colour_gradient2(name = "topog", low="blue", mid="green", high="red", na.value="white", midpoint=60)  +
  geom_point(data = df, aes(x = lon, y = lat, colour=rad), na.rm=TRUE) +
@@ -66,6 +67,7 @@ ggplot() +
  axis.title.y = element_text(size = 20, vjust = 0.2),
  legend.text = element_text(size = 10)) +
  coord_map("stereographic", orientation=c(90, 0,0), ylim=c(90, 60))
+print(p)
 dev.off()
 close.nc(nc)
 print(getwd())
