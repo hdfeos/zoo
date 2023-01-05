@@ -70,4 +70,4 @@ axis.title.y = element_text(size = 20, vjust = 0.2),
 legend.text = element_text(size = 10)) +
 coord_map("stereographic", orientation=c(90, 0,0), ylim=c(90, 60))
 dev.off()
-nc_close(nc)
+close.nc(nc)

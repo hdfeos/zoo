@@ -65,4 +65,9 @@ jobs:
       - name: Generate data
         run: |
           source("GESDISC/AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf.r")
-        shell: Rscript {0} 
+        shell: Rscript {0}
+      - name: Upload        
+        uses: actions/upload-artifact@v2
+        with:
+          name: plot
+          path: AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf.r.png
