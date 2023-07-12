@@ -11,7 +11,7 @@ contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS Forum
 
 Usage:  save this script and run
 
-    $python CER_ES4_Aqua-Xtrk_Edition4_403409.202201.hdf.s.py
+    $python CER_ES4_Aqua-Xtrk_Edition4_403409.202201.hdf.d.py
 
 The HDF file must be in your current working directory.
 
@@ -21,16 +21,15 @@ Last updated: 2023-07-11
 
 import os
 
-import matplotlib.pyplot as plt
 import numpy as np
-from mpl_toolkits.basemap import Basemap
+import pandas as pd
 from pyhdf.HDF import HC, HDF
 from pyhdf.SD import SD, SDC
 from pyhdf.V import V
 
 FILE_NAME = "CER_ES4_Aqua-Xtrk_Edition4_403409.202201.hdf"
 VG_NAME = "2.5 Degree Regional"
-VG2_NAME = "Monthly (Day) Averages"
+VG2_NAME = "Daily Averages"
 VG3_NAME = "Total-Sky"
 DATAFIELD_NAME = "Longwave flux"
 
@@ -65,6 +64,7 @@ for tag, ref in members:
         if name == DATAFIELD_NAME:
             # Read dataset.
             data = sds[:]
+
             # Read attributes.
             attrs = sds.attributes(full=1)
             la = attrs["long_name"]
@@ -112,29 +112,21 @@ flag = not np.any(s)
 if flag:
     print("No data for the region.")
 
-datas = datam[s]
-lons = longitude[s]
-lats = latitude[s]
+# Calculate daily average.
+_l = []
+for i in range(0, datam.shape[0]):
+    datas = datam[i, :, :]
+    m = np.mean(datas)
+    _l.append([i, m])
 
-m = Basemap(
-    projection="cyl",
-    resolution="l",
-    llcrnrlat=-90,
-    urcrnrlat=90,
-    llcrnrlon=-180,
-    urcrnrlon=180,
-)
-m.drawcoastlines(linewidth=0.5)
-m.drawparallels(np.arange(-90.0, 90, 45))
-m.drawmeridians(np.arange(-180.0, 180, 45), labels=[True, False, False, True])
-cm = plt.cm.jet
-m.scatter(lons, lats, c=datas, s=1, cmap=cm, edgecolors=None, linewidth=0)
-
-cb = m.colorbar()
-cb.set_label(units)
-
+df = pd.DataFrame(_l, columns=["Day", "Mean"])
 basename = os.path.basename(FILE_NAME)
-plt.title("{0}\n{1}".format(basename, long_name))
-fig = plt.gcf()
-pngfile = "{0}.s.py.png".format(basename)
+t = "{0}\n{1}\n{2} on [0N, 30N] & [20E, 60E]".format(
+    FILE_NAME, long_name, DATAFIELD_NAME
+)
+plt = df.groupby("Day").mean().plot(title=t)
+plt.locator_params(integer=True)
+
+fig = plt.get_figure()
+pngfile = "{0}.d.py.png".format(basename)
 fig.savefig(pngfile)
