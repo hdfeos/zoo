@@ -16,7 +16,7 @@ Usage:  save this script and run
 The HDF file must be in your current working directory.
 
 Tested under: Python 3.9.13 :: Miniconda
-Last updated: 2023-07-11
+Last updated: 2023-07-12
 """
 
 import os
@@ -116,7 +116,7 @@ if flag:
 _l = []
 for i in range(0, datam.shape[0]):
     datas = datam[i, :, :]
-    m = np.mean(datas)
+    m = np.mean(datas[s])
     _l.append([i, m])
 
 df = pd.DataFrame(_l, columns=["Day", "Mean"])
