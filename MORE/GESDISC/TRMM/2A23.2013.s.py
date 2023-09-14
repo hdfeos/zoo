@@ -1,6 +1,6 @@
 """
 This example code illustrates how to read multiple GES DISC 2A23 Swath
-files and calculate daily average over South Africa region in Python.
+files and calculate seasonal average over South Africa region in Python.
 
 If you have any questions, suggestions, or comments on this example, please use
 the HDF-EOS Forum (http://hdfeos.org/forums).  If you would like to see an
@@ -11,12 +11,12 @@ contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS Forum
 
 Usage: save this script and run
 
-    $python 2A23.2015.d.py
+    $python 2A23.2013.s.py
 
 The HDF4 files must be in your current working directory.
 
 Tested under: Python 3.9.13 :: Miniconda
-Last updated: 2023-09-08
+Last updated: 2023-09-12
 """
 
 import glob
@@ -36,7 +36,7 @@ lonbounds = [16.3449768409, 32.830120477]
 i = 0
 _l = []
 
-for fn in sorted(glob.glob("2A23.2015*.7.HDF")):
+for fn in sorted(glob.glob("2A23.2013*.7.HDF")):
     print(fn)
 
     hdf = SD(fn, SDC.READ)
@@ -81,28 +81,29 @@ for fn in sorted(glob.glob("2A23.2015*.7.HDF")):
     if np.isnan(m) or np.isnan(m2):
         print("All values are NaN for either FreezH or BBH.")
     else:
-        day = fn[5:13]
-        print(day)
-        _l.append([int(day), m, m2])
+        mo = int(fn[9:11])
+        s = np.floor(mo / 3)
+        if s == 4:
+            s = 0
+        print(s)        
+        _l.append([s, m, m2])
 
     i = i + 1
 
 # Put titles.
-t = "{0}\n{1}".format("2A23 Daily Average", DATAFIELD_NAME)
+t = "{0}\n{1}".format("2A23 2013 Seasonal Average", DATAFIELD_NAME)
 t2 = "{0}".format(DATAFIELD_NAME2)
 
-df = pd.DataFrame(_l, columns=["Day", "Mean", "Mean2"])
-df["datetime"] = pd.to_datetime(df["Day"], format="%Y%m%d")
-df = df.drop("Day", axis=1)
+df = pd.DataFrame(_l, columns=["Season", "Mean", "Mean2"])
 
 print(df)
 
 fig, axs = plt.subplots(2, 1, sharex=True)
-pl = df.groupby("datetime")["Mean"].mean().plot(title=t, ax=axs[0], ylabel=units)
+pl = df.groupby("Season")["Mean"].mean().plot(title=t, ax=axs[0], ylabel=units)
 # HBB has the same units as freezH.
-p2 = df.groupby("datetime")["Mean2"].mean().plot(title=t2, color="red",
-                                                 ax=axs[1], ylabel=units)
-
+p2 = df.groupby("Season")["Mean2"].mean().plot(title=t2, color="red",
+                                              ax=axs[1], ylabel=units)
+p2.locator_params(integer=True)
 # Save the plot.
-pngfile = "2A23.2015.d.py.png"
+pngfile = "2A23.2013.s.py.png"
 fig.savefig(pngfile)
