@@ -12,12 +12,12 @@ contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS Forum
 
 Usage:  save this script and run
 
-   $python 2A.GPM.Ku.V9-20230112.20230911-S114508-E131736.054183.V07B.HDF5.py
+   $python 2A.GPM.Ka.V9-20230112.20230911-S114508-E131736.054183.V07B.HDF5.v.py
 
 The HDF file must be in your current working directory.
 
 Tested under: Python 3.9.13 :: Miniconda
-Last updated: 2023-10-06
+Last updated: 2023-10-05
 """
 
 import os
@@ -28,7 +28,7 @@ from mpl_toolkits.basemap import Basemap
 
 import h5py
 
-file_name = "2A.GPM.Ku.V9-20230112.20230911-S114508-E131736.054183.V07B.HDF5"
+file_name = "2A.GPM.Ka.V9-20230112.20230911-S114508-E131736.054183.V07B.HDF5"
 
 with h5py.File(file_name, mode="r") as f:
     name = "/FS/SLV/zFactorFinal"
@@ -37,12 +37,14 @@ with h5py.File(file_name, mode="r") as f:
     _FillValue = f[name].attrs["_FillValue"]
     data[data == _FillValue] = np.nan
     data = np.ma.masked_where(np.isnan(data), data)
-    data = data[:,:,175]
-    
+
     # Get the geolocation data.
     latitude = f["/FS/Latitude"][:]
     longitude = f["/FS/Longitude"][:]
-
+    alt_name = "/FS/PRE/height"
+    altitude = f[alt_name][:]
+    alt_units = f[alt_name].attrs["units"]
+    
     # Subset India region.
     latbounds = [8.4, 37.6]
     lonbounds = [68.7, 97.25]
@@ -57,34 +59,30 @@ with h5py.File(file_name, mode="r") as f:
     flag = not np.any(s)
     if flag:
         print("No data for the region.")
-
-    datas = data[s]
+    datas = data[s,:]
     lons = longitude[s]
     lats = latitude[s]
+    alts = altitude[s,:]
 
-    m = Basemap(
-        projection="cyl",
-        resolution="l",
-        llcrnrlat=-90,
-        urcrnrlat=90,
-        llcrnrlon=-180,
-        urcrnrlon=180,
-    )
-    m.drawcoastlines(linewidth=0.5)
-    m.drawparallels(np.arange(-90, 91, 45))
-    m.drawmeridians(
-        np.arange(-180, 180, 45), labels=[True, False, False, True]
-    )
-    m.scatter(
-        lons, lats, c=datas, s=1, cmap=plt.cm.jet, edgecolors=None, linewidth=0
-    )
-    cb = m.colorbar(location="bottom", pad="10%")
-    units = units.decode("ascii", "replace")
-    cb.set_label(units)
+    # Find an index that has no fill value at the height index 175.
+    a = np.where(~np.isnan(datas[:,175]))
+    b = np.unique(a)
 
+    # You can pick a different location. We use the first one.
+    loc = b[0]
+
+    plt.plot(datas[loc,:], alts[loc,:])
+    alt_units = alt_units.decode("ascii", "replace")    
+    plt.ylabel(alt_name+' ('+alt_units+')')
     basename = os.path.basename(file_name)
-    plt.title("{0}\n{1}".format(basename, name))
-    fig = plt.gcf()
+    units = units.decode("ascii", "replace")
+    plt.xlabel('{0} ({1})'.format(name, units))
+    loc_name = 'Latitude='+str(lats[loc])+' Longitude='+str(lons[loc])
+    plt.title('{0}\n{1}'.format(basename, loc_name))    
 
-    pngfile = "{0}.py.png".format(basename)
+    fig = plt.gcf()
+    pngfile = "{0}.v.py.png".format(basename)
     fig.savefig(pngfile)
+
+# Reference
+# [1] https://gpmweb2https.pps.eosdis.nasa.gov/pub/stout/helpdesk/filespec.GPM.V7.pdf

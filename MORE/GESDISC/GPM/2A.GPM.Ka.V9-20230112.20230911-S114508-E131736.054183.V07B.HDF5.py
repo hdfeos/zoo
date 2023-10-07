@@ -17,7 +17,7 @@ Usage:  save this script and run
 The HDF file must be in your current working directory.
 
 Tested under: Python 3.9.13 :: Miniconda
-Last updated: 2023-10-02
+Last updated: 2023-10-03
 """
 
 import os
@@ -31,13 +31,14 @@ import h5py
 file_name = "2A.GPM.Ka.V9-20230112.20230911-S114508-E131736.054183.V07B.HDF5"
 
 with h5py.File(file_name, mode="r") as f:
-    name = "/FS/SLV/precipRateESurface"
+    name = "/FS/SLV/zFactorFinal"
     data = f[name][:]
     units = f[name].attrs["units"]
     _FillValue = f[name].attrs["_FillValue"]
     data[data == _FillValue] = np.nan
     data = np.ma.masked_where(np.isnan(data), data)
-
+    data = data[:,:,175]
+    
     # Get the geolocation data.
     latitude = f["/FS/Latitude"][:]
     longitude = f["/FS/Longitude"][:]
@@ -87,3 +88,6 @@ with h5py.File(file_name, mode="r") as f:
     # plt.show()
     pngfile = "{0}.py.png".format(basename)
     fig.savefig(pngfile)
+
+# Reference
+# [1] https://gpmweb2https.pps.eosdis.nasa.gov/pub/stout/helpdesk/filespec.GPM.V7.pdf
