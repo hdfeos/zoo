@@ -1,0 +1,102 @@
+;
+; This example code illustrates how to access and visualize LP DAAC
+; ECOSTRESS L2 HDF5 Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl ECOSTRESS_L2_LSTE_30192_017_20231102T165047_0601_01.h5.idl
+;
+; Tested under: IDL 8.9.0
+; Last updated: 2023-11-06
+
+; Open file.
+file_name = 'ECOSTRESS_L2_LSTE_30192_017_20231102T165047_0601_01.h5'
+file_id = H5F_OPEN(file_name)
+
+fgeo_name = 'ECOSTRESS_L1B_GEO_30192_017_20231102T165047_0601_01.h5'
+fgeo_id = H5F_OPEN(fgeo_name)
+
+datafield_name = '/SDS/LST'
+data_id = H5D_OPEN(file_id, datafield_name)
+data = H5D_READ(data_id)
+
+; Get units attribute.
+units_id = H5A_OPEN_NAME(data_id, 'units')
+units = H5A_READ(units_id)
+H5A_Close, units_id
+
+; Get long_name attribute.
+long_name_id = H5A_OPEN_NAME(data_id, 'long_name')
+long_name = H5A_READ(long_name_id)
+H5A_Close, long_name_id
+
+; Get scale_factor attribute.
+scale_factor_id = H5A_OPEN_NAME(data_id, 'scale_factor')
+scale_factor = H5A_READ(scale_factor_id)
+H5A_Close, scale_factor_id
+
+; Get add_offset attribute.
+add_offset_id = H5A_OPEN_NAME(data_id, 'add_offset')
+add_offset = H5A_READ(add_offset_id)
+H5A_Close, add_offset_id
+
+; Get missing value attribute.
+fillvalue_id = H5A_OPEN_NAME(data_id, '_FillValue')
+fillvalue = H5A_READ(fillvalue_id)
+
+; Convert data type.
+dataf = float(data)
+fillvaluef = float(fillvalue(0))
+H5A_CLOSE, fillvalue_id
+H5D_CLOSE, data_id
+
+; Read latitude.
+latitude_name='/Geolocation/latitude'
+latitude_id=H5D_OPEN(fgeo_id, latitude_name)
+lat=H5D_READ(latitude_id)
+
+; Close dataset.
+H5D_CLOSE, latitude_id
+
+; Read longitude.
+lon_name='Geolocation/longitude'
+lon_id=H5D_OPEN(fgeo_id, lon_name)
+lon=H5D_READ(lon_id)
+
+; Close dataset.
+H5D_CLOSE, lon_id
+
+; Process missing value, convert dataf that are equal to fillvaluef to NaN
+idx = where(dataf eq fillvaluef(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+if cnt gt 0 then lat[idx] = !Values.F_NAN
+if cnt gt 0 then lon[idx] = !Values.F_NAN
+dataf=(scale_factor(0))*(dataf)+add_offset(0)
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+
+m = MAP('Geographic', TITLE=file_name, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.35, 0.01, long_name)
+c1 = SCATTERPLOT(lon[*], lat[*], OVERPLOT=m, $
+                 MAGNITUDE=dataf[*], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9], $
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], /BORDER, ORIENTATION=1, $
+              TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

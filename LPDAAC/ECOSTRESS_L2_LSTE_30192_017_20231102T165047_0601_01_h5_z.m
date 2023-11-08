@@ -1,0 +1,119 @@
+%
+%  This example code illustrates how to access and visualize an
+% LPDAAC ECOSTRESS L2 HDF5 file in MATLAB. 
+%
+%  If you have any questions, suggestions, comments on this example, please 
+% use the HDF-EOS Forum (http://hdfeos.org/forums). 
+% 
+%  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+% product that is not listed in the HDF-EOS Comprehensive Examples page 
+% (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org 
+% or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+%
+% Usage:save this script and run (without .m at the end)
+%
+%
+% $matlab -nosplash -nodesktop -r ECOSTRESS_L2_LSTE_30192_017_20231102T165047_0601_01_h5_z
+%
+% Tested under: MATLAB R2023b
+% Last updated: 2023-11-07
+
+% Open the HDF5 File.
+FILE_NAME = 'ECOSTRESS_L2_LSTE_30192_017_20231102T165047_0601_01.h5';
+FGEO_NAME = 'ECOSTRESS_L1B_GEO_30192_017_20231102T165047_0601_01.h5';
+file_id = H5F.open(FILE_NAME, 'H5F_ACC_RDONLY', 'H5P_DEFAULT');
+fgeo_id = H5F.open(FGEO_NAME, 'H5F_ACC_RDONLY', 'H5P_DEFAULT');
+
+% Open the dataset.
+DATAFIELD_NAME = 'SDS/LST';
+data_id = H5D.open(file_id, DATAFIELD_NAME);
+
+Lat_NAME = 'Geolocation/latitude';
+lat_id = H5D.open(fgeo_id, Lat_NAME);
+
+Lon_NAME = 'Geolocation/longitude';
+lon_id = H5D.open(fgeo_id, Lon_NAME);
+
+% Read the dataset.
+data = H5D.read(data_id,'H5T_NATIVE_DOUBLE', 'H5S_ALL', 'H5S_ALL', 'H5P_DEFAULT');
+lat = H5D.read(lat_id,'H5T_NATIVE_DOUBLE', 'H5S_ALL', 'H5S_ALL', 'H5P_DEFAULT');
+lon = H5D.read(lon_id,'H5T_NATIVE_DOUBLE', 'H5S_ALL', 'H5S_ALL', 'H5P_DEFAULT');
+
+
+% Read the fill value.
+ATTRIBUTE = '_FillValue';
+attr_id = H5A.open_name(data_id, ATTRIBUTE);
+fillvalue = H5A.read(attr_id, 'H5T_NATIVE_DOUBLE');
+
+% Read the units.
+ATTRIBUTE = 'units';
+attr_id = H5A.open_name(data_id, ATTRIBUTE);
+units = H5A.read(attr_id, 'H5ML_DEFAULT');
+
+
+% Read title attribute.
+ATTRIBUTE = 'long_name';
+attr_id = H5A.open_name(data_id, ATTRIBUTE);
+long_name = H5A.read(attr_id, 'H5ML_DEFAULT');
+
+% Read scale_factor attribute.
+ATTRIBUTE = 'scale_factor';
+attr_id = H5A.open_name (data_id, ATTRIBUTE);
+scale = H5A.read (attr_id, 'H5T_NATIVE_DOUBLE');
+
+% Read add_offset attribute.
+ATTRIBUTE = 'add_offset';
+attr_id = H5A.open_name (data_id, ATTRIBUTE);
+offset = H5A.read (attr_id, 'H5T_NATIVE_DOUBLE');
+
+% Close and release resources.
+H5A.close(attr_id)
+H5D.close(data_id);
+H5F.close(file_id);
+
+H5D.close(lat_id);
+H5D.close(lon_id);
+H5F.close(fgeo_id);
+
+% Replace the fill value with NaN.
+data(data==fillvalue) = NaN;
+
+% Apply scale factor.
+data = data*scale+offset;
+
+f = figure('Name', FILE_NAME, 'Renderer', 'zbuffer', ...
+           'Position', [0,0,800,600], ...
+           'visible', 'off');
+
+% Set map limits.
+latlim=[floor(min(min(lat))),ceil(max(max(lat)))];
+lonlim=[floor(min(min(lon))),ceil(max(max(lon)))];
+
+% Create the plot.
+axesm('MapProjection', 'eqaconic',...
+      'Frame', 'on', 'Grid', 'on', ...
+      'MapLatLimit', latlim, 'MapLonLimit', lonlim, ...
+      'MeridianLabel','on','ParallelLabel','on', ...
+      'MLabelLocation', 1, 'PLabelLocation', 1, ...
+      'MLabelParallel', 'south')
+
+% Plot the data.
+cm = colormap('Jet');
+surfm(lat, lon, data);
+coast = load('coastlines.mat');
+plotm(coast.coastlat, coast.coastlon, 'k');
+tightmap;
+
+h = colorbar();
+
+units1 = sprintf('%s', char(units));
+set(get(h, 'title'), 'string', units1, 'FontSize', 8, ...
+                  'Interpreter', 'None', ...
+                  'FontWeight','bold');
+  
+name = sprintf('%s', long_name);
+
+title({FILE_NAME; name}, ... 
+      'Interpreter', 'None', 'FontSize', 10, 'FontWeight', 'bold');
+saveas(f, [FILE_NAME '.z.m.png']);
+exit;
