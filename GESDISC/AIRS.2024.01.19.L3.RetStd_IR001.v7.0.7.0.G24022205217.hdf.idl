@@ -1,0 +1,87 @@
+;
+; This example code illustrates how to access and visualize GESDISC
+; AIRS Grid file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl AIRS.2024.01.19.L3.RetStd_IR001.v7.0.7.0.G24022205217.hdf.idl
+;
+; Tested under: IDL 8.9.0
+; Last updated: 2024-01-31
+
+; Open file.
+file_name='AIRS.2024.01.19.L3.RetStd_IR001.v7.0.7.0.G24022205217.hdf'
+file_id = EOS_GD_OPEN(file_name)
+
+; Define grid name.
+grid_name='ascending'
+datafield_name='Temperature_A'
+
+; Retrieve data.
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+status = EOS_GD_READFIELD(grid_id, datafield_name, data)
+
+; Retrive fillvalue.
+status=EOS_GD_GETFILLVALUE(grid_id, datafield_name, fillvalue)
+status = EOS_GD_DETACH(grid_id)
+
+; Retrieve lat/lon.
+grid_name='location'
+lon_name='Longitude'
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+status = EOS_GD_READFIELD(grid_id, lon_name, lon)
+status = EOS_GD_DETACH(grid_id)
+
+grid_name='location'
+lat_name='Latitude'
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+status = EOS_GD_READFIELD(grid_id, lat_name, lat)
+status = EOS_GD_READATTR(grid_id, "Year", y)
+status = EOS_GD_READATTR(grid_id, "Month", m)
+status = EOS_GD_READATTR(grid_id, "Day", d)
+ystr = STRING(y(0)) 
+mstr = STRING(m(0))
+dstr = STRING(d(0))
+day = ystr.TRIM()+'-'+mstr.TRIM()+'-'+dstr.TRIM()
+status = EOS_GD_DETACH(grid_id)
+status = EOS_GD_CLOSE(file_id)
+
+; Convert the 3D data to 2D data at TempPrsLvls=0.
+data2D = data[*,*,0]
+data2D = Reform(data2D)
+
+; Convert data type.
+dataf=float(data2D)
+fillvaluef=float(fillvalue(0))
+
+; Process fill values, convert data that are equal to fillvalue to NaN.
+idx=WHERE(dataf eq fillvaluef, cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+
+t1 = TEXT(0.35, 0.01, datafield_name+' at StdPrsLvls=0' + ' on '+day)
+c1 = CONTOUR(dataf, lon, lat, /FILL, /BUFFER, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+
+unit = 'K'
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=unit)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
