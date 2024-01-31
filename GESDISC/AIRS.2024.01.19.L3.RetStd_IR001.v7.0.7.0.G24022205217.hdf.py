@@ -16,7 +16,7 @@ Usage:  save this script and run
 The HDF file must be in your current working directory.
 
 Tested under: Python 3.9.1 :: Miniconda
-Last updated: 2024-01-24
+Last updated: 2024-01-31
 """
 
 import os
@@ -96,7 +96,7 @@ cb = m.colorbar()
 cb.set_label("Unit:K")
 basename = os.path.basename(FILE_NAME)
 plt.title(
-    "{0}\n {1} at TempPrsLvls=0 on {2}".format(basename, DATAFIELD_NAME, date)
+    "{0}\n {1} at StdPrsLvls=0 on {2}".format(basename, DATAFIELD_NAME, date)
 )
 fig = plt.gcf()
 pngfile = "{0}.py.png".format(basename)
