@@ -1,6 +1,3 @@
-# Copyright (C) 2016 by The HDF Group.
-#  All rights reserved.
-#
 # This example code illustrates how to access and visualize GESDISC AIRS Swath
 # in R.
 #
@@ -17,10 +14,10 @@
 # $Rscript AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf.r
 #
 # Tested under: R 3.3.1
-# Last updated: 2016-11-22
+# Last updated: 2024-02-12
 library(fields)
 library(maps)
-library(maptools)
+# library(maptools)
 library(ncdf4)
 library(raster)
 library(ggmap)
