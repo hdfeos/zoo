@@ -15,8 +15,8 @@ Usage:  save this script and run
 
 The HDF file must be in your current working directory.
 
-Tested under: Python 3.9.1 :: Miniconda
-Last updated: 2024-01-22
+Tested under: Python 3.9.13 :: Miniconda
+Last updated: 2024-01-25
 """
 import os
 
@@ -80,7 +80,7 @@ alt = np.zeros(290)
 # for i in range (0, 199):
 #       alt[i] = 8.2 + i*0.06;
 # -0.5km to 8.2km
-for i in range(0, 289):
+for i in range(0, 290):
     alt[i] = -0.5 + i * 0.03
 
 # Contour the data on a grid of latitude vs. pressure

@@ -1,4 +1,7 @@
-# This example code illustrates how to access and visualize GES DISC AIRS Swath
+# Copyright (C) 2016 by The HDF Group.
+#  All rights reserved.
+#
+# This example code illustrates how to access and visualize GESDISC AIRS Swath
 # in R.
 #
 # If you have any questions, suggestions, comments  on this example, please 
@@ -13,62 +16,56 @@
 #
 # $Rscript AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf.r
 #
-# Tested under: R 4.2.2
-# Last updated: 2023-01-05
-
-
+# Tested under: R 3.3.1
+# Last updated: 2016-11-22
 library(fields)
 library(maps)
-library(sp)
-library(mapproj)
-library(RNetCDF)
+library(maptools)
+library(ncdf4)
+library(raster)
 library(ggmap)
 library(akima)
 library(reshape)
-
-
-# Download file.
-options(timeout=120)
-download.file("https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf", "AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf")
+data(wrld_simpl)
 
 # Open file.
 fname <- 'AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf'
-nc <- open.nc(fname)
-# print.nc(nc)
-nc_data <- read.nc(nc)
-# print(nc_data)
-b <- nc_data$topog
-print(b)
+nc <- nc_open(fname)
+v1 <- nc$var[['topog']]
+z_all <- ncvar_get(nc, v1)
+zv <- as.vector(as.single(z_all))
+zz <- file("tmpbin", "wb")
+writeBin(zv, zz)
+close(zz)
+zz2 <- file("tmpbin", "rb")
+zs <- readBin(zz2, numeric(), size=4, length(zv), endian="little")
+close(zz2)
+dim(zs) <- dim(z_all)
+b <- zs[,]
 b[b == -9999.0] <- NA
-lat <- nc_data$Latitude
-print(lat)
-lon <- nc_data$Longitude
-print(lon)
+lat <- ncvar_get(nc, 'Latitude')
+lon <- ncvar_get(nc, 'Longitude')
 remap.tbl <- data.frame(coordinates(lon),
-                         lon=as.vector(lon),lat=as.vector(lat))
+                        lon=as.vector(lon),lat=as.vector(lat))
 df <- data.frame(lon=as.vector(lon), lat=as.vector(lat), rad=as.vector(b))
 png(paste(fname, ".r.png", sep=""), width=640, height=480)
 mapWorld <- borders("world") 
 wd <- map_data("world")
-p =
- ggplot() +
- mapWorld  +
- scale_colour_gradient2(name = "topog", low="blue", mid="green", high="red", na.value="white", midpoint=60)  +
- geom_point(data = df, aes(x = lon, y = lat, colour=rad), na.rm=TRUE) +
- ggtitle(fname) +
- ylab("Latitude") +
- xlab("Longitude") +
- theme_linedraw() +
- theme(plot.title = element_text(size = 15, face = "bold"),
- legend.title = element_text(size = 15),
- axis.text = element_text(size = 15),
- axis.text.x = element_blank(),
- axis.title.x = element_blank(),
- axis.title.y = element_text(size = 20, vjust = 0.2),
- legend.text = element_text(size = 10)) +
- coord_map("stereographic", orientation=c(90, 0,0), ylim=c(90, 60))
-print(p)
+ggplot() +
+mapWorld +
+scale_colour_gradient2(name = "topog", low="blue", mid="green", high="red", na.value="white", midpoint=60) +
+geom_point(data = df, aes(x = lon, y = lat, colour=rad), na.rm=TRUE) +
+ggtitle(fname) +
+ylab("Latitude") +
+xlab("Longitude") +
+theme_linedraw() +
+theme(plot.title = element_text(size = 15, face = "bold"),
+legend.title = element_text(size = 15),
+axis.text = element_text(size = 15),
+axis.text.x = element_blank(),
+axis.title.x = element_blank(),
+axis.title.y = element_text(size = 20, vjust = 0.2),
+legend.text = element_text(size = 10)) +
+coord_map("stereographic", orientation=c(90, 0,0), ylim=c(90, 60))
 dev.off()
-close.nc(nc)
-print(getwd())
-print(list.files('.'))
+nc_close(nc)

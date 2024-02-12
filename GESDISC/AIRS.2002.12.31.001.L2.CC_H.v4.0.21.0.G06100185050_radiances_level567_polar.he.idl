@@ -1,0 +1,133 @@
+; This example code illustrates how to access and visualize GESDISC
+; AIRS Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Refer to: AIRS.2002.12.31.001.L2.CC_H.v4.0.21.0.G06100185050.hdf
+; DataField name: radiances
+
+; IDL example for reading GESDISC_AIRS Swath file
+
+; Open file
+  file_name='AIRS.2002.12.31.001.L2.CC_H.v4.0.21.0.G06100185050.hdf'
+
+; Define Swath name
+  swath_name='L2_Standard_cloud-cleared_radiance_product'
+  file_id=EOS_SW_OPEN(file_name)
+  swath_id=EOS_SW_ATTACH(file_id, swath_name)
+
+; retrieve data
+  datafield_name='radiances'
+  status=EOS_SW_READFIELD(swath_id,datafield_name,data)
+
+; Convert the M-D data to 2D data at Channel=567
+  data2D=data[567,*,*]
+  data2D=reform(data2D)
+
+; Convert data type
+  dataf=float(data2D)
+
+; retrieve lat/lon
+  status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+  status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+  status=EOS_SW_DETACH(swath_id)
+  status=EOS_SW_CLOSE(file_id)
+
+; Get vertex value for lat and lon
+  latmin=MIN(lat)
+  latmax=MAX(lat)
+  lonmin=MIN(lon)
+  lonmax=MAX(lon)
+
+; read fillvalue from original data and define it
+  fillvalue=-9999.00
+  fillvaluef=float(fillvalue(0))
+
+; Process fill values, convert data that are equal to fillvalue to NaN
+  idx=WHERE(dataf eq fillvaluef, cnt)
+  IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Process valid_range.
+  idx=WHERE(dataf LT valid_range(0) OR dataf GT valid_range(1), cnt)
+  IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Get max and min value of data for color bar.
+  datamin = MIN(dataf, /NAN)
+  datamax = MAX(dataf, /NAN)
+
+; The following coding is prepared for colorbar. If you require colorbar in your plot, you could download Dr. 
+; Fan's Coyote Library from (http://www.dfanning.com/documents/programs.html). Make a directory named coyote 
+; somewhere on your machine, and extract the Coyote files into it. If color bar is not not necessary for your
+; plot, you can ignore this step and add comment character ';' ahead of coding. 
+; Add the coyote directory you create on your machine to your IDL path. 
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+  !PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; Prepare field name title using long name attribute.
+  field = datafield_name
+
+; See page 101 "AIRS Version 5.0 Released Files Description" document [1]
+; for unit specification.
+  units = 'mW/m**2/cm**-1/sr'
+
+; Generate a plot.
+  levels=254
+  device,decomposed=0
+  LoadCT,33, Ncolors=levels, Bottom=1
+  WINDOW, Title = 'FIELD:' + field + ' at Channel=567' + '   ' + 'UNIT:' + units, XSIZE=800, YSIZE=800
+  MAP_SET, /STEREO, -90,0, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+    POSITION=[0.05, 0.05, 0.80, 0.82], LIMIT=[latmin, -180, latmax, 180]
+  CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+  MAP_GRID, /Label, COLOR=255
+  MAP_CONTINENTS, COLOR=255
+
+; Draw file name, field name, and unit.
+  XYOUTS, 0.05, 0.86, /NORMAL, 'FIELD:' + field + ' at Channel=567', $
+    CHARSIZE=1.25,  ALIGNMENT=0.0
+  XYOUTS, 0.94, 0.86, /NORMAL, 'UNIT:' + units, $ 
+    CHARSIZE=1.25,  ALIGNMENT=1.0
+  XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+    CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+; If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+; If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+; Add the coyote directory that you created on your machine to your IDL
+; path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; We assume that the coyote library is installed under the current working
+; directory that this code exists.
+  !PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+; If you don't need a color bar in your plot, you can ignore this step
+; by adding comment character ';' at the beginning of the code.
+  COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+   POSITION=[0.9,0.08,0.94,0.8]
+
+; Write JPEG image file.
+  im = TVRD(TRUE=3)
+  jpg = 'AIRS.2002.12.31.001.L2.CC_H.v4.0.21.0.G06100185050_radiances_level567_Polar.idl.JPG' 
+  WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; Reference
+;
+; [1] http://disc.sci.gsfc.nasa.gov/AIRS/documentation/v5_docs/AIRS_V5_Release_User_Docs/V5_Released_ProcFileDesc.pdf
+; [2] http://www.dfanning.com/documents/programs.html

@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"
+ xmlns:gx="http://www.google.com/kml/ext/2.2">
+<!-- 
+
+Copyright (C) 2013 The HDF Group
+All Rights Reserved.
+
+This example code illustrates how to visualize MASTERL1B flight path in Google
+Earth.
+
+If you have any questions, suggestions, comments  on this example, 
+please use the HDF-EOS Forum (http://hdfeos.org/forums). 
+
+If you would like to see an  example of any other NASA HDF/HDF-EOS data product
+ that is not listed in the HDF-EOS Comprehensive Examples page 
+(http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or 
+post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+The following OPeNDAP URL 
+
+http://eosdap.hdfgroup.uiuc.edu:8080/opendap/data/test/MASTERL1B_1300406_01_20130619_2135_2138_V01.hdf.ascii?AircraftLatitude[0:440:4383],AircraftLongitude[0:440:4383],AircraftHeading[0:440:4383],AircraftAltitude[0:440:4383],AircraftPitch[0:440:4383]
+
+produces ASCII output:
+
+Dataset: MASTERL1B_1300406_01_20130619_2135_2138_V01.hdf
+AircraftLatitude, 37.0294154399435, 37.0424188986033, 37.0573661459169, 37.0726309849291, 37.0877726821271, 37.1028680160291, 37.1181343335053, 37.1336595789947, 37.1493018349872, 37.165030305654
+AircraftLongitude, -119.880814239976, -119.851501173203, -119.823695355533, -119.796116432193, -119.768287139133, -119.740284409548, -119.712337964054, -119.684352069355, -119.656263976636, -119.628071478178
+AircraftHeading, 61.3167457777737, 55.658504456595, 52.7990399378512, 53.0021509731129, 53.4777288571251, 53.3417433723814, 52.7231032858439, 52.5600345512419, 52.5449900334206, 52.6312226126333
+AircraftAltitude, 4370.1708136034, 4371.777430002, 4370.28410867125, 4371.85480701684, 4371.74238958646, 4371.51579987901, 4372.38724761982, 4371.48969733434, 4372.76053071867, 4373.71756538832
+AircraftPitch, 2.45976392683993, 2.33480318504572, 2.64968410064172, 2.58791782285443, 2.4992054380347, 2.54566400747104, 2.2722857701284, 2.37879833029572, 2.38570269610885, 2.20937390035773
+
+ This KML is constructed with a text editor (Emacs) using the above 10 dataset 
+points.
+ 
+-->
+<Document>
+  <name>MASTERL1B_1300406_01_20130619_2135_2138_V01.hdf</name>
+  <open>1</open>
+
+  <gx:Tour>
+    <name>Fly!</name>
+    <gx:Playlist>
+      <!-- 1 -->
+      <gx:FlyTo>
+        <gx:duration>5.0</gx:duration>
+        <!-- bounce is the default flyToMode -->
+        <gx:flyToMode>smooth</gx:flyToMode>
+        <Camera>
+          <longitude>-119.880814239976</longitude>
+          <latitude>37.0294154399435</latitude>
+          <altitude>4370.1708136034</altitude>
+          <heading>61.3167457777737</heading>
+          <tilt>2.45976392683993</tilt>
+          <altitudeMode>absolute</altitudeMode>
+        </Camera>
+      </gx:FlyTo>
+      <gx:Wait>
+        <gx:duration>5.0</gx:duration>
+      </gx:Wait>
+
+      <!-- 2 -->
+      <gx:FlyTo>
+        <gx:duration>5.0</gx:duration>
+        <gx:flyToMode>smooth</gx:flyToMode>
+        <Camera>
+          <longitude>-119.851501173203</longitude>
+          <latitude>37.0424188986033</latitude>
+          <altitude>4371.777430002</altitude>
+          <heading>55.658504456595</heading>
+          <tilt>2.33480318504572</tilt>
+          <altitudeMode>absolute</altitudeMode>
+        </Camera>
+      </gx:FlyTo>
+      <gx:Wait>
+        <gx:duration>5.0</gx:duration>
+      </gx:Wait>
+
+
+      <!-- 3 -->
+      <gx:FlyTo>
+        <gx:duration>5.0</gx:duration>
+        <gx:flyToMode>smooth</gx:flyToMode>
+        <Camera>
+          <longitude>-119.823695355533</longitude>
+          <latitude>37.0573661459169</latitude>
+          <altitude>4370.28410867125</altitude>
+          <heading>52.7990399378512</heading>
+          <tilt>2.64968410064172</tilt>
+          
+          <altitudeMode>absolute</altitudeMode>
+        </Camera>
+      </gx:FlyTo>
+      <gx:Wait>
+        <gx:duration>5.0</gx:duration>
+      </gx:Wait>
+
+     <!-- 4 -->
+      <gx:FlyTo>
+        <gx:duration>3.0</gx:duration>
+        <gx:flyToMode>smooth</gx:flyToMode>
+        <Camera>
+          <longitude>-119.796116432193</longitude>
+          <latitude>37.0726309849291</latitude>
+          <altitude>4371.85480701684</altitude>
+          <heading>53.0021509731129</heading>
+          <tilt>2.58791782285443</tilt>
+          
+          <altitudeMode>absolute</altitudeMode>
+        </Camera>
+       </gx:FlyTo>
+      <gx:Wait>
+        <gx:duration>5.0</gx:duration>
+      </gx:Wait>
+
+     <!-- 5 -->
+      <gx:FlyTo>
+        <gx:duration>5.0</gx:duration>
+        <gx:flyToMode>smooth</gx:flyToMode>
+        <Camera>
+          <longitude>-119.768287139133</longitude>
+          <latitude>37.0877726821271</latitude>
+          <altitude>4371.74238958646</altitude>
+          <heading>53.4777288571251</heading>
+          <tilt>2.4992054380347</tilt>
+          
+          <altitudeMode>absolute</altitudeMode>
+        </Camera>
+      </gx:FlyTo>
+      <gx:Wait>
+        <gx:duration>5.0</gx:duration>
+      </gx:Wait>
+
+     <!-- 6 -->
+      <gx:FlyTo>
+        <gx:duration>5.0</gx:duration>
+        <gx:flyToMode>smooth</gx:flyToMode>
+        <Camera>
+          <longitude>-119.740284409548</longitude>
+          <latitude>37.1028680160291</latitude>
+          <altitude>4371.51579987901</altitude>
+          <heading>53.3417433723814</heading>
+          <tilt>2.54566400747104</tilt>
+          
+          <altitudeMode>absolute</altitudeMode>
+        </Camera>
+      </gx:FlyTo>
+      <gx:Wait>
+        <gx:duration>5.0</gx:duration>
+      </gx:Wait>
+
+     <!-- 7 -->
+      <gx:FlyTo>
+        <gx:duration>5.0</gx:duration>
+        <gx:flyToMode>smooth</gx:flyToMode>
+        <Camera>
+          <longitude>-119.712337964054</longitude>
+          <latitude>37.1181343335053</latitude>
+          <altitude>4372.38724761982</altitude>
+          <heading>52.7231032858439</heading>
+          <tilt>2.2722857701284</tilt>
+          
+          <altitudeMode>absolute</altitudeMode>
+        </Camera>
+      </gx:FlyTo>
+      <gx:Wait>
+        <gx:duration>5.0</gx:duration>
+      </gx:Wait>
+
+
+     <!-- 8 -->
+      <gx:FlyTo>
+        <gx:duration>5.0</gx:duration>
+        <gx:flyToMode>smooth</gx:flyToMode>
+        <Camera>
+          <longitude>-119.684352069355</longitude>
+          <latitude>37.1336595789947</latitude>
+          <altitude>4371.48969733434</altitude>
+          <heading>52.5600345512419</heading>
+          <tilt>2.37879833029572</tilt>
+          
+          <altitudeMode>absolute</altitudeMode>
+        </Camera>
+      </gx:FlyTo>
+      <gx:Wait>
+        <gx:duration>5.0</gx:duration>
+      </gx:Wait>
+
+     <!-- 9 -->
+      <gx:FlyTo>
+        <gx:duration>5.0</gx:duration>
+        <gx:flyToMode>smooth</gx:flyToMode>
+        <Camera>
+          <longitude>-119.656263976636</longitude>
+          <latitude>37.1493018349872</latitude>
+          <altitude>4372.76053071867</altitude>
+          <heading>52.5449900334206</heading>
+          <tilt>2.38570269610885</tilt>
+          
+          <altitudeMode>absolute</altitudeMode>
+        </Camera>
+      </gx:FlyTo>
+      <gx:Wait>
+        <gx:duration>5.0</gx:duration>
+      </gx:Wait>
+
+     <!-- 10 -->
+      <gx:FlyTo>
+        <gx:duration>5.0</gx:duration>
+        <gx:flyToMode>smooth</gx:flyToMode>
+        <Camera>
+          <longitude>-119.628071478178</longitude>
+          <latitude>37.165030305654</latitude>
+          <altitude>4373.71756538832</altitude>
+          <heading>52.6312226126333</heading>
+          <tilt>2.20937390035773</tilt>
+          
+          <altitudeMode>absolute</altitudeMode>
+        </Camera>
+      </gx:FlyTo>
+      <gx:Wait>
+        <gx:duration>5.0</gx:duration>
+      </gx:Wait>
+
+    </gx:Playlist>
+  </gx:Tour>
+</Document>
+</kml>

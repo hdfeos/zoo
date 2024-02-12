@@ -1,0 +1,140 @@
+; This example code illustrates how to access and visualize GESDISC
+; TRMM Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; open file
+  file_name='GSSTF.2b.2008.01.01.he5'
+  file_id=H5F_OPEN(file_name)
+
+  datafield1_name='/HDFEOS/GRIDS/SET1/Data Fields/STv'
+  data1_id=H5D_OPEN(file_id,datafield1_name)
+
+  datafield2_name='/HDFEOS/GRIDS/SET2/Data Fields/STv'
+  data2_id=H5D_OPEN(file_id,datafield2_name)
+
+  dataspace1_id=H5D_GET_SPACE(data1_id)
+  dims1=H5S_GET_SIMPLE_EXTENT_DIMS(dataspace1_id)
+  dims1=float(dims1)
+
+  dataspace2_id=H5D_GET_SPACE(data2_id)
+  dims2=H5S_GET_SIMPLE_EXTENT_DIMS(dataspace2_id)
+  dims2=float(dims2)
+
+; Convert data type for division operator
+  lon1_dims=dims1(0)
+  lat1_dims=dims1(1)
+
+  lon2_dims=dims2(0)
+  lat2_dims=dims2(1)
+
+  data1=H5D_READ(data1_id)
+  data2=H5D_READ(data2_id)
+
+; Get units
+  units1_id=H5A_OPEN_NAME(data1_id, 'Units')
+  units1=H5A_READ(units1_id)
+
+  units2_id=H5A_OPEN_NAME(data2_id, 'Units')
+  units2=H5A_READ(units2_id)
+
+; Get fillvalue
+  fillvalue1_id=H5A_OPEN_NAME(data1_id,'_FillValue')
+  fillvalue1=H5A_READ(fillvalue1_id)
+
+  fillvalue2_id=H5A_OPEN_NAME(data2_id,'_FillValue')
+  fillvalue2=H5A_READ(fillvalue2_id)
+
+; Get longname
+  longname1_id=H5A_OPEN_NAME(data1_id,'LongName')
+  longname1=H5A_READ(longname1_id)
+
+  longname2_id=H5A_OPEN_NAME(data2_id,'LongName')
+  longname2=H5A_READ(longname2_id)
+
+  H5A_Close, longname1_id
+  H5A_Close, fillvalue1_id
+  H5D_Close, data1_id
+
+  H5A_Close, longname2_id
+  H5A_Close, fillvalue2_id
+  H5D_Close, data2_id
+
+; get max and min value of data1
+  idx=where(data1 ne fillvalue1(0), cnt)
+  if cnt gt 0 then datamin1=min(data1[idx])
+  if cnt gt 0 then datamax1=max(data1[idx])
+
+; Process fill value, convert data that are equal to fillvalue to NaN
+  idx=where(data1 eq fillvalue1(0), cnt)
+  if cnt gt 0 then data1[idx] = !Values.F_NAN
+
+; get max and min value of data2
+  idx=where(data2 ne fillvalue2(0), cnt)
+  if cnt gt 0 then datamin2=min(data2[idx])
+  if cnt gt 0 then datamax2=max(data2[idx])
+
+; Process fill value, convert data that are equal to fillvalue to NaN
+  idx=where(data2 eq fillvalue2(0), cnt)
+  if cnt gt 0 then data2[idx] = !Values.F_NAN
+
+; Calculate the latitude and longitude range based on vector points and lat/lon step
+  lat1=FINDGEN(180)*(180.0/lat1_dims)-90
+  lon1=FINDGEN(360)*(360.0/lon1_dims)-180
+
+; Calculate the latitude and longitude range based on vector points and lat/lon step
+  lat2=FINDGEN(180)*(180.0/lat2_dims)-90
+  lon2=FINDGEN(360)*(360.0/lon2_dims)-180
+
+; The following coding is prepared for colorbar. If you require colorbar in your plot, you could download Dr. 
+; Fan's Coyote Library from (http://www.dfanning.com/documents/programs.html). Make a directory named coyote 
+; somewhere on your machine, and extract the Coyote files into it. If color bar is not not necessary for your
+; plot, you can ignore this step and add comment character ';' ahead of coding. 
+; Add the coyote directory you create on your machine to your IDL path. 
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+  !PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; Start off generating the plot
+  levels = 254
+  device, decomposed=0
+  LoadCT, 33, Ncolors=levels, Bottom=1
+  WINDOW, title=file_name+' Daily '+longname1, XSIZE=1000, YSIZE=400
+  !P.MULTI=[0, 2, 1, 0, 1]
+  MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, POSITION=[0.02, 0.06, 0.42, 0.82], /NOERASE
+  CONTOUR, data1, lon1, lat1, /OVERPLOT, /Cell_FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+  MAP_CONTINENTS, COLOR=black
+  MAP_GRID, /BOX_AXES, COLOR=black
+  XYOuts, 0.03, 0.88, /Normal, 'SET1 '+longname1, Charsize=1.25, color=black, Alignment=0.0
+  XYOuts, 0.43, 0.88, /Normal, 'units:'+units1, Charsize=1.25, Color=black, Alignment=1.0
+  XYOuts, 0.5, 0.94, /Normal, file_name, Charsize=1.75, Color=black, Alignment=0.5
+; The following coding is to generate color bar if your already download and install Dr. Fanning's Coyote Library 
+; and add the coyote directory above. 
+; If you don't need color bar in your plot, you can ignore this step and add comment character ';' ahead of coding.
+  COLORBAR, Range=[datamin1, datamax1], Ncolors=levels, /Vertical, Position=[0.47,0.1,0.48,0.82], FORMAT='(F4.1)'
+
+  MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, POSITION=[0.51, 0.06, 0.93, 0.82], /NOERASE
+  CONTOUR, data2, lon2, lat2, /OVERPLOT, /Cell_FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+  MAP_CONTINENTS, COLOR=black
+  MAP_GRID, /BOX_AXES, COLOR=black
+  XYOuts, 0.51, 0.88, /Normal, 'SET2 '+longname2, Charsize=1.25, color=black, Alignment=0.0
+  XYOuts, 0.94, 0.88, /Normal, 'units:'+units2, Charsize=1.25, Color=black, Alignment=1.0
+
+; The following coding is to generate color bar if your already download and install Dr. Fanning's Coyote Library 
+; and add the coyote directory above. 
+; If you don't need color bar in your plot, you can ignore this step and add comment character ';' ahead of coding.
+  COLORBAR, Range=[datamin2, datamax2], Ncolors=levels, /Vertical, Position=[0.98,0.1,0.99,0.82], FORMAT='(F4.1)'
+
+; Write JPEG image file.
+  im = TVRD(TRUE=3)
+  jpg = 'GSSTF.2b.2008.01.01_Daily_meridional_wind_stress.idl.JPG' 
+  WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; Reference
+;
+; [1] http://www.dfanning.com/documents/programs.html

@@ -1,0 +1,120 @@
+;  This example code illustrates how to access and visualize PO.DAAC AQUARIUS
+; SSS L3 Grid HDF5 file in NCL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Tested under: IDL 8.0
+; Last updated: 2012-02-27
+
+; Open file.
+file_name='Q2012034.L3m_DAY_EVSCI_V1.2DR_SSS_1deg.h5';
+file_id=H5F_OPEN(file_name)
+
+; Read data.
+datafield_name='/l3m_data'
+data_id=H5D_OPEN(file_id,datafield_name)
+data=H5D_READ(data_id)
+
+; Get title.
+title_id=H5A_OPEN_NAME(file_id, 'Parameter')
+title=H5A_READ(title_id)
+H5A_Close, title_id
+
+; Get units.
+units_id=H5A_OPEN_NAME(file_id, 'Units')
+units=H5A_READ(units_id)
+H5A_Close, units_id
+
+; Close dataset.
+H5D_Close, data_id
+
+; Close file.
+H5F_Close, file_id
+
+; Convert type to double.
+dataf = float(data)
+
+; Filter data based on "Suggested Image Scaling Maximum" and 
+; "Suggested Image Scaling Minimum" file attribute values
+; as specified in [1].
+idx=where(data gt 38.0, cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+idx=where(data lt 32.0, cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+; Retrieve dimension sizes of data.
+dimsize=size(dataf,/dim)
+numlat=dimsize(1)
+numlon=dimsize(0)
+
+; Generate simple lat/lon. 
+; It's simple 360 (lon) x 180 (lat) size grid.
+lat = 90.0 - (FINDGEN(numlat) + 0.5) 
+lon = (FINDGEN(numlon) + 0.5) - 180
+
+; Generate the plot.
+levels = 254
+DEVICE, DECOMPOSED=0
+LoadCT, 33, NCOLORS=levels, BOTTOM=1
+WINDOW, Title=file_name, XSIZE=800, YSIZE=600
+MAP_SET, /Grid, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+         POSITION=[0.05, 0.06, 0.82, 0.80], /NOERASE
+CONTOUR, dataf,  lon, lat, /OVERPLOT,   /CELL_FILL, $
+         C_COLORS=Indgen(levels)+3, $
+         BACKGROUND=1, NLEVELS=levels, COLOR=Black, $
+         POSITION=[0.1, 0.1, 0.82, 0.8]
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+
+XYOuts, 0.05, 0.87, /Normal, 'FIELD:' + title, $
+ Charsize=1.25, color=black, Alignment=0.0
+XYOuts, 0.94, 0.87, /Normal, 'UNIT:' + units, $ 
+  Charsize=1.25, Color=black, Alignment=1.0
+XYOuts, 0.43, 0.92, /Normal, file_name, $
+  Charsize=1.75, Color=black, Alignment=0.5
+
+;   The following code is prepared for colorbar. 
+;
+;   If you require colorbar in your plot, you could download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' ahead of coding. 
+;
+;    Add the coyote directory you create on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; Let's assume that you've installed coyote library under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+datamin=MIN(dataf, /NAN)
+datamax=MAX(dataf, /NAN)
+COLORBAR, Range=[datamin,datamax], Ncolors=levels, /Vertical, $
+ Position=[0.9,0.1,0.94,0.8], FORMAT='(F5.2)'
+
+; Write JPEG image file.
+im = TVRD(TRUE=3)
+jpg = file_name + '.idl.jpg'   
+WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; References
+;
+; [1] http://podaac.jpl.nasa.gov/sites/default/files/AquariusUserGuideH_V3.0.pdf
+; [2] http://www.dfanning.com/documents/programs.html

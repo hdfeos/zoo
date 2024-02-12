@@ -1,0 +1,85 @@
+;
+;  This example code illustrates how to access and visualize LaRC MISR AM1 AS
+; AEROSOL netCDF-4 file in IDL. 
+;
+;  If you have any questions, suggestions, comments on this example, please use
+; the HDF-EOS Forum (http://hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or 
+; post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  %idl MISR_AM1_AS_AEROSOL_P004_O066234_F13_0023.nc.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2018-09-07
+
+
+; Open file.
+file_name='MISR_AM1_AS_AEROSOL_P004_O066234_F13_0023.nc'
+file_id = H5F_OPEN(file_name)
+
+; Read data.
+datafield_name='/4.4_KM_PRODUCTS/Aerosol_Optical_Depth'
+data_id=H5D_OPEN(file_id,datafield_name)
+data=H5D_READ(data_id)
+
+; Handle attributes.
+_FillValue_id=H5A_OPEN_NAME(data_id,'_FillValue')
+_FillValue=H5A_READ(_FillValue_id)
+H5A_CLOSE, _FillValue_id
+
+title_id=H5A_OPEN_NAME(data_id, 'long_name')
+long_name=H5A_READ(title_id)
+H5A_CLOSE, title_id
+  
+units_id=H5A_OPEN_NAME(data_id, 'units')
+units=H5A_READ(units_id)
+H5A_CLOSE, units_id
+
+;__FillValuef=float(_FillValue(0))
+
+; Close dataset.
+H5D_CLOSE, data_id
+
+; Read latitude.
+latitude_name='/4.4_KM_PRODUCTS/Latitude'
+latitude_id=H5D_OPEN(file_id, latitude_name)
+lat=H5D_READ(latitude_id)
+
+; Close dataset.
+H5D_CLOSE, latitude_id
+
+; Read longitude.
+lon_name='/4.4_KM_PRODUCTS/Longitude'
+lon_id=H5D_OPEN(file_id, lon_name)
+lon=H5D_READ(lon_id)
+
+; Close dataset.
+H5D_CLOSE, lon_id
+
+; Process fill value.
+dataf=FLOAT(data)  
+idx=WHERE(dataf EQ _FillValue(0), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.35, 0.2, long_name)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, $
+              POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+
+
+

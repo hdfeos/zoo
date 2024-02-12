@@ -1,0 +1,103 @@
+;
+; This example code illustrates how to access and visualize GESDISC
+; OMI Grid file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  %idl OMI-Aura_L2G-OMSO2G_2017m0123_v003-2017m0124t071057.he5.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2017-12-19
+
+; Open file
+  file_name='OMI-Aura_L2G-OMSO2G_2017m0123_v003-2017m0124t071057.he5'
+  file_id=H5F_OPEN(file_name)
+
+; Read data variable.
+  datafield_name='/HDFEOS/GRIDS/OMI Total Column Amount SO2/Data Fields/ColumnAmountSO2_PBL'
+  data_id=H5D_OPEN(file_id, datafield_name)
+  data=H5D_READ(data_id)
+  
+; Retrieve title, units, missing value, scale_factor and offset attributes.
+  title_id=H5A_OPEN_NAME(data_id, 'Title')
+  long_name=H5A_READ(title_id)
+  H5A_CLOSE, title_id
+  
+  units_id=H5A_OPEN_NAME(data_id, 'Units')
+  units=H5A_READ(units_id)
+  H5A_CLOSE, units_id
+  
+  scale_factor_id=H5A_OPEN_NAME(data_id, 'ScaleFactor')
+  scale_factor=H5A_READ(scale_factor_id)
+  H5A_CLOSE, scale_factor_id
+  
+  add_offset_id=H5A_OPEN_NAME(data_id, 'Offset')
+  add_offset=H5A_READ(add_offset_id)
+  H5A_CLOSE, add_offset_id
+
+  valid_range_id=H5A_OPEN_NAME(data_id, 'ValidRange')
+  valid_range=H5A_READ(valid_range_id)
+  H5A_CLOSE, valid_range_id
+  
+  _FillValue_id=H5A_OPEN_NAME(data_id,'_FillValue')
+  _FillValue=H5A_READ(_FillValue_id)
+  H5A_CLOSE, _FillValue_id
+  _FillValuef=float(_FillValue(0))
+  
+  H5D_CLOSE, data_id
+
+; Read lat/lon variable.
+  lat_name='/HDFEOS/GRIDS/OMI Total Column Amount SO2/Data Fields/Latitude'
+  lat_id=H5D_OPEN(file_id, lat_name)
+  lat=H5D_READ(lat_id)
+  H5D_CLOSE, lat_id
+  
+  lon_name='/HDFEOS/GRIDS/OMI Total Column Amount SO2/Data Fields/Longitude'
+  lon_id=H5D_OPEN(file_id, lon_name)
+  lon=H5D_READ(lon_id)
+  H5D_CLOSE, lon_id
+
+; Subset at nCandidate = 0.
+  nCandidate = 0
+  data = data(*,*,nCandidate);
+  lat = lat(*,*,nCandidate)
+  lon = lon(*,*,nCandidate)
+
+; Process fill value, convert dataf that are equal to _FillValuef to
+; NaN
+  dataf=FLOAT(data)  
+  idx=WHERE(dataf EQ _FillValuef(0), cnt)
+  IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Conver type and apply scale/offset.
+  dataf=(scale_factor(0))*(dataf-add_offset(0))
+
+; Process valid_range values.
+  idx=where(dataf LT valid_range(0) OR dataf GT valid_range(1), cnt)
+  if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+
+; Plot data on map.  
+; file_name is long so reduce font size.
+  m = MAP('Geographic', TITLE=file_name, /BUFFER, FONT_SIZE=10)
+
+; Use rainbow color map.
+  ct = COLORTABLE(13)
+  t1 = TEXT(0.35, 0.01, long_name + ' at nCandidate = 0')
+  c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+               RGB_TABLE=ct, $
+               GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+  mc = MAPCONTINENTS()
+  cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, $
+                POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+  png = file_name + '.idl.png'
+  c1.save, png, HEIGHT=600, WIDTH=800
+  EXIT

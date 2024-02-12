@@ -1,0 +1,161 @@
+; This example code illustrates how to access and visualize OBPG_MODISA HDF4 file in IDL. 
+; If you have any questions, suggestions, comments on this example, please use the HDF-EOS Forum (http://hdfeos.org/forums). 
+; If you would like to see an  example of any other NASA HDF/HDF-EOS data product that is not listed in the HDF-EOS 
+; Comprehensive Examples page (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or post it at 
+; the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Refer to: T2010001000000.L2_LAC_SST.hdf
+; DataField name: sst
+
+; IDL example for reading OBPG_MODISA L2 HDF4 file
+; Open file
+  file_name='T2010001000000.L2_LAC_SST.hdf'
+  newFileID=HDF_SD_START(file_name, /READ)
+
+; Retrieve Number of Pixel Control Points
+  numColAtt=HDF_SD_ATTRFIND(newFileID,'Number of Pixel Control Points')
+  HDF_SD_ATTRINFO, newFileID, numColAtt, DATA=numCol
+
+; Define datafield
+  datafield_name="sst"
+  index=HDF_SD_NAMETOINDEX(newFileID,datafield_name)
+
+; Retrieve data
+  thisSdsID=HDF_SD_SELECT(newFileID, index)
+  HDF_SD_GETDATA, thisSdsID, data
+
+; retrieve long_name, units, slope and intercept
+  long_name_index=HDF_SD_ATTRFIND(thisSdsID, 'long_name')
+  HDF_SD_ATTRINFO, thisSdsID, long_name_index, DATA=long_name
+
+  units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+  HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+ 
+  slope_index=HDF_SD_ATTRFIND(thisSdsID, 'slope')
+  HDF_SD_ATTRINFO, thisSdsID, slope_index, data=slope
+
+  intercept_index=HDF_SD_ATTRFIND(thisSdsID, 'intercept')
+  HDF_SD_ATTRINFO, thisSdsID, intercept_index, data=intercept
+
+; Reading lon/lat information 
+  lon_name="longitude"
+  index=HDF_SD_NAMETOINDEX(newFileID,lon_name)
+
+  thisSdsID=HDF_SD_SELECT(newFileID, index)
+  HDF_SD_GETDATA, thisSdsID, lon
+
+  lat_name="latitude"
+  index=HDF_SD_NAMETOINDEX(newFileID,lat_name)
+
+  thisSdsID=HDF_SD_SELECT(newFileID, index)
+  HDF_SD_GETDATA, thisSdsID, lat
+
+  datafield_name="cntl_pt_cols"
+  index=HDF_SD_NAMETOINDEX(newFileID,datafield_name)
+
+  thisSdsID=HDF_SD_SELECT(newFileID, index)
+  HDF_SD_GETDATA, thisSdsID, valueInCell
+
+  HDF_SD_END, newFileID
+
+; read fillvalue from data
+  fillvalue=-32767.00
+
+; Convert data type
+  dataf=float(data)
+  fillvaluef=float(fillvalue)
+
+; Data transformation
+  dataf=intercept(0)+(slope(0))*dataf
+  fillvaluef=intercept(0)+(slope(0))*fillvaluef
+
+; Process fill values, convert data that are equal to fillvalue to NaN
+  idx=where(dataf eq fillvaluef(0), cnt)
+
+; Process valid_range.
+  idx=WHERE(dataf LT valid_range(0) OR dataf GT valid_range(1), cnt)
+  IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Get max and min value of data for color bar.
+  datamin = MIN(dataf, /NAN)
+  datamax = MAX(dataf, /NAN)
+
+; Interpolate lat and lon to match the size of data
+  dimsize=size(data, /dim)
+  numlat=dimsize(0)
+  numlon=dimsize(1)
+
+  step1=valueInCell(2)-valueInCell(1)
+  step2=valueInCell(numCol-1)-valueInCell(numCol-2)
+
+  nlat=FINDGEN(numlat,numlon)
+  nlon=FINDGEN(numlat,numlon)
+
+;loop to generate nlat and nlon
+  for i=0,numCol(0)-3 Do for j=0, numlon-1 do for k=0,7 do nlat(i*(step1)+k,j)=lat(i,j)+k*(lat(i+1,j)-lat(i,j))/(step1)
+  for i=0,numCol(0)-3 Do for j=0, numlon-1 do for k=0,7 do nlon(i*8+k,j)=lon(i,j)+k*(lon(i+1,j)-lon(i,j))/8
+
+  for i=numCol(0)-2,numCol(0)-2 Do for j=0, numlon-1 do for k=0,9 do nlat(i*(step1)+k,j)=lat(i,j)+k*(lat(i+1,j)-lat(i,j))/(step2)
+  for i=numCol(0)-2,numCol(0)-2 Do for j=0, numlon-1 do for k=0,9 do nlon(i*(step1)+k,j)=lon(i,j)+k*(lon(i+1,j)-lon(i,j))/(step2)
+
+; The following coding is prepared for colorbar. If you require colorbar in your plot, you could download Dr. 
+; Fan's Coyote Library from (http://www.dfanning.com/documents/programs.html). Make a directory named coyote 
+; somewhere on your machine, and extract the Coyote files into it. If color bar is not not necessary for your
+; plot, you can ignore this step and add comment character ';' ahead of coding. 
+; Add the coyote directory you create on your machine to your IDL path. 
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+  !PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; Start off generating the plot
+  levels=254
+  device,decomposed=0
+  LoadCT,33, Ncolors=levels, Bottom=1
+  WINDOW, Title='FIELD:'+ long_name + '  ' + 'UNIT:' + units, XSIZE=800, YSIZE=500
+  MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, POSITION=[0.05, 0.05, 0.81, 0.82], /NOERASE
+  CONTOUR, dataf, nlon, nlat, /OVERPLOT, /Cell_FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+  MAP_GRID, /BOX_AXES, COLOR=255
+  MAP_CONTINENTS, COLOR=255
+
+; Draw file name, field name, and unit.
+  XYOUTS, 0.05, 0.87, /NORMAL, 'FIELD:' + long_name, $
+    CHARSIZE=1.25,  ALIGNMENT=0.0
+  XYOUTS, 0.94, 0.87, /NORMAL, 'UNIT:' + units, $ 
+    CHARSIZE=1.25,  ALIGNMENT=1.0
+  XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+    CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+; If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [1]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+; If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+; Add the coyote directory that you created on your machine to your IDL
+; path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; We assume that the coyote library is installed under the current working
+; directory that this code exists.
+  !PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+; If you don't need a color bar in your plot, you can ignore this step
+; by adding comment character ';' at the beginning of the code.
+  COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+    Position=[0.9,0.05,0.94,0.82]
+
+; Write JPEG image file.
+  im = TVRD(TRUE=3)
+  jpg = 'T2010001000000.L2_LAC_SST_SST.idl.JPG'   
+  WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; Reference
+;
+; [1] http://www.dfanning.com/documents/programs.html

@@ -1,0 +1,88 @@
+;
+; This example code illustrates how to access and visualize GESDISC
+; OMI Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  %idl OMI-Aura_L2-OMNO2_2008m0720t2016-o21357_v003-2008m0721t101450.he5.idl
+;
+; Tested under: IDL 8.2.3
+; Last updated: 2017-05-03
+
+; Open file
+  file_name='OMI-Aura_L2-OMNO2_2008m0720t2016-o21357_v003-2008m0721t101450.he5'
+  file_id=H5F_OPEN(file_name)
+
+; Read data variable.
+  datafield_name='/HDFEOS/SWATHS/ColumnAmountNO2/Data Fields/CloudFraction'
+  data_id=H5D_OPEN(file_id, datafield_name)
+  data=H5D_READ(data_id)
+  
+; Retrieve title, units, missing value, scale_factor and offset attributes.
+  title_id=H5A_OPEN_NAME(data_id, 'Title')
+  long_name=H5A_READ(title_id)
+  H5A_CLOSE, title_id
+  
+  units_id=H5A_OPEN_NAME(data_id, 'Units')
+  units=H5A_READ(units_id)
+  H5A_CLOSE, units_id
+  
+  slope_id=H5A_OPEN_NAME(data_id, 'ScaleFactor')
+  slope=H5A_READ(slope_id)
+  H5A_CLOSE, slope_id
+  
+  intercept_id=H5A_OPEN_NAME(data_id, 'Offset')
+  intercept=H5A_READ(intercept_id)
+  H5A_CLOSE, intercept_id
+  
+  missingvalue_id=H5A_OPEN_NAME(data_id,'MissingValue')
+  missingvalue=H5A_READ(missingvalue_id)
+  H5A_CLOSE, missingvalue_id
+  missingvaluef=float(missingvalue(0))
+  
+  H5D_CLOSE, data_id
+
+; Read lat/lon variable.
+  lat_name='/HDFEOS/SWATHS/ColumnAmountNO2/Geolocation Fields/Latitude'
+  lat_id=H5D_OPEN(file_id, lat_name)
+  lat=H5D_READ(lat_id)
+  H5D_CLOSE, lat_id
+  
+  lon_name='/HDFEOS/SWATHS/ColumnAmountNO2/Geolocation Fields/Longitude'
+  lon_id=H5D_OPEN(file_id, lon_name)
+  lon=H5D_READ(lon_id)
+  H5D_CLOSE, lon_id
+  
+; Conver type and apply scale/offset.
+  dataf=FLOAT(data)
+  dataf=(slope(0))*(dataf-intercept(0))
+  missingvaluef=(slope(0))*(missingvaluef-intercept(0))
+
+; Process missing value, convert dataf that are equal to missingvaluef to NaN
+  idx=WHERE(dataf EQ missingvaluef(0), cnt)
+  IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Get max and min value of data for color bar.
+  datamin = MIN(dataf, /NAN)
+  datamax = MAX(dataf, /NAN)
+
+; Plot data on map.  
+m = MAP('Geographic', TITLE=file_name)
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.35, 0.01, long_name)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

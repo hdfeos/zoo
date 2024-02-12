@@ -1,0 +1,119 @@
+;
+;  This example code illustrates how to access and visualize NSIDC AMSR-E
+; Sea Ice 25km HDF-EOS5 Grid file in IDL.
+; This Grid file uses Polar Stereographic projection.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+; $idl AMSR_U2_L3_SeaIce25km_B01_20181008.he5.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2018-10-11
+
+FILE_NAME='AMSR_U2_L3_SeaIce25km_B01_20181008.he5'
+GRID_NAME='NpPolarGrid25km'
+DATAFIELD_NAME='SI_25km_NH_89V_DAY'
+
+; Open file.
+file_id = H5F_OPEN(FILE_NAME)
+
+datafield_name='/HDFEOS/GRIDS/'+GRID_NAME+'/Data Fields/'+DATAFIELD_NAME
+data_id=H5D_OPEN(file_id,datafield_name)
+data=H5D_READ(data_id)
+
+; Close dataset.
+H5D_CLOSE, data_id
+
+; Close file.
+H5F_CLOSE, file_id
+
+; Set fill value.
+fillvalue = 0
+
+; Convert data type
+dataf=float(data)
+
+; Process fill value.
+idx=where(data eq fillvalue, cnt)
+if cnt gt 0 then dataf[idx]=!Values.F_NAN
+
+; Multiply scale by 0.1 to get Kelvin.
+dataf = dataf * 0.1
+
+; Get max and min value of data.
+datamin = min(dataf, /NAN)
+datamax = max(dataf, /NAN)
+
+; The file contains Polar Stereographic projection. 
+; Retrieve dimension sizes of data
+dimsize=size(data,/dim)
+xdimsize=dimsize(0)
+ydimsize=dimsize(1)
+
+; IDL's Polar Stereographic projection code is 106. 
+projcode = 106
+
+; Find projection information using HDFView.
+; Open StructMetadata.0 dataset to read parameters.
+; From ProjParams=(...)
+clon = -45000000.0/1000000.0
+clat = 70000000.0/1000000.0
+
+; Please note that /GCTP must be specified. 
+mapStruct = MAP_PROJ_INIT(projcode, /GCTP, CENTER_LONGITUDE=clon, $
+                          CENTER_LATITUDE=clat)
+; Units are in m.
+x0 = -3850000
+x1 = 3750000                    
+y0 = 5850000                    
+y1 = -5350000                   
+
+xinc = (x1 - x0 ) / xdimsize
+yinc = (y1 - y0 ) / ydimsize
+x = FINDGEN(xdimsize)*(xinc)  + x0
+y = FINDGEN(ydimsize)*(yinc)  + y0
+
+; Create mesh.
+xarr = x # Replicate(1, N_Elements(y))
+yarr = Replicate(1, N_Elements(x)) # y
+
+; See MAP_RPOJ_INVERSE IDL reference manual.
+; The function returns (2,n) array of lat/lon.
+result  = MAP_PROJ_INVERSE(xarr, yarr, MAP_STRUCTURE=mapStruct)
+lon = result[0,*]
+lat = result[1,*]
+
+; Get min/max values for lat and lon.
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+m = MAP('Polar Stereographic', $
+  LIMIT=[latmin, lonmin, latmax, lonmax], $
+  CENTER_LATITUDE=90.0, $
+  TITLE=file_name, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+
+; Do not use /FILL to handle fill values correctly on polar
+; stereographic projection.
+t1 = TEXT(0.35, 0.01, DATAFIELD_NAME)
+c1 = SCATTERPLOT(lon, lat, OVERPLOT=m, $
+                 MAGNITUDE = dataf[*], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+unit = 'K'
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=unit)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

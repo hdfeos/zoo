@@ -1,0 +1,139 @@
+;
+;  This example code illustrates how to access and visualize LP DAAC
+; MEaSUREs WELD CONUS Albers Grid file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+; $idl CONUS.annual.2012.h01v06.doy007to356.v1.5.hdf.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2018-05-08
+
+; Define file name, grid name, and data field.
+file_name='CONUS.annual.2012.h01v06.doy007to356.v1.5.hdf'
+grid_name='WELD_GRID'
+datafield_name='NDVI_TOA'
+
+; Open file.
+file_id = EOS_GD_OPEN(file_name)
+
+; Attach Grid.
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+
+; Retrieve data.
+status = EOS_GD_READFIELD(grid_id, datafield_name, data)
+
+; Detach Grid.
+status = EOS_GD_DETACH(grid_id)
+
+; Close file
+status = EOS_GD_CLOSE(file_id)
+
+; Retrieve  _FillValue, units, scale_factor, and valid_range
+; attributes. 
+file_id_hdf=HDF_SD_START(file_name, /READ)
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+
+valid_range_index=HDF_SD_ATTRFIND(sds_id, 'valid_range')
+HDF_SD_ATTRINFO, sds_id, valid_range_index, data=valid_range
+
+scalefactor_index=HDF_SD_ATTRFIND(sds_id, 'scale_factor')
+HDF_SD_ATTRINFO, sds_id, scalefactor_index, DATA=scale_factor
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+HDF_SD_ENDACCESS, sds_id
+HDF_SD_END, file_id_hdf
+
+
+; Get the data field dimensions
+dimsize=size(data,/dim)
+numlat=dimsize(0)
+numlon=dimsize(1)
+
+; This Grid is not a standard grid that requires lat/lon dumper tool [1].
+;
+; Open the ASCII geolocation file and read the latitude data into a 1-D array.
+lat_filename='lat_' + file_name + '.output'
+OPENR,1,lat_filename
+size=numlat*numlon
+valinlat=FLTARR(size)
+READF,1,valinlat
+close,1
+
+; Open the ASCII geolocation file and read the longitude data into a 1-D array.
+lon_filename='lon_' + file_name + '.output'
+OPENR,2,LON_FILENAME
+size=numlat*numlon
+valinlon=FLTARR(size)
+READF,2,valinlon
+CLOSE,2
+
+
+; Reform the lat/lon arrays to 2-D grids of same dimensions as the data field.
+lat=FINDGEN(numlat,numlon)
+lat=Reform(ValInlat,numlat,numlon)
+
+lon=FINDGEN(numlat,numlon)
+lon=Reform(ValInlon,numlat,numlon)
+
+
+; Get min/max value of lat and lon for zoomed image.
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+; Convert data type.
+dataf=FLOAT(data)
+
+; Process fillvalue.
+idx=WHERE(data EQ fillvalue(0), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Process valid_range.
+idx=WHERE(data LT valid_range(0) OR data GT valid_range(1), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Apply scale factor.
+dataf = dataf * scale_factor(0)
+
+; This product doesn't have long_name attribute so we use the
+; datafield name for labeling the plot.
+long_name = datafield_name
+
+; Generate a plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER, $
+        LIMIT=[latmin, lonmin, latmax, lonmax])
+ct = COLORTABLE(72, /reverse)
+; Subset every 10th point to avoid out of memory error.
+c1 = CONTOUR(dataf[0:*:10, 0:*:10], lon[0:*:10, 0:*:10], lat[0:*:10, 0:*:10], $
+             /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, long_name)
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, $
+              TEXTPOS=1, POSITION=[0.85,0.3,0.87,0.7], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, WIDTH=800, HEIGHT=600
+EXIT
+
+; Reference
+;
+; [1] http://hdfeos.org/zoo/note_non_geographic.php
+

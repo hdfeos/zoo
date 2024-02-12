@@ -1,0 +1,136 @@
+;  This example code illustrates how to access and visualize LAADS MOD11
+; Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Define file name, swath name, and data field.
+FILE_NAME='MOD11_L2.A2007278.0350.005.2007280073443.hdf'
+SWATH_NAME='MOD_Swath_LST'
+DATAFIELD_NAME='LST'
+
+; Open file.
+file_id=EOS_SW_OPEN(FILE_NAME)
+swath_id=EOS_SW_ATTACH(file_id, SWATH_NAME)
+
+; Retrieve data.
+status=EOS_SW_READFIELD(swath_id,DATAFIELD_NAME,data)
+
+; Close file.
+status=EOS_SW_DETACH(swath_id)
+status=EOS_SW_CLOSE(file_id)
+
+; Get long_name, fill value, units, scale_factor, and offset.
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+index = HDF_SD_NAMETOINDEX(newFileID, DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+long_name_index=HDF_SD_ATTRFIND(thisSdsID, 'long_name')
+HDF_SD_ATTRINFO, thisSdsID, long_name_index, DATA=long_name
+
+fillvalue_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, fillvalue_index, data=fillvalue
+
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+scale_index=HDF_SD_ATTRFIND(thisSdsID, 'scale_factor')
+HDF_SD_ATTRINFO, thisSdsID, scale_index, data=scale
+
+offset_index=HDF_SD_ATTRFIND(thisSdsID, 'add_offset')
+HDF_SD_ATTRINFO, thisSdsID, offset_index, DATA=offset
+
+HDF_SD_END, newFileID
+
+; Since dimension maps are used in the eos_file, 
+; we must use geolocation values that are stored in a 
+; secondary file.
+FILE_NAME_GEO ='MOD03.A2007278.0350.005.2009162161456.hdf'
+SWATH_NAME_GEO = 'MODIS_Swath_Type_GEO'
+file_id = EOS_SW_OPEN(FILE_NAME_GEO)
+swath_id=EOS_SW_ATTACH(file_id, SWATH_NAME_GEO)
+
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+
+status=EOS_SW_DETACH(swath_id)
+status=EOS_SW_CLOSE(file_id)
+
+
+; Convert data type.
+dataf=float(data)
+
+; Process fill value.
+dataf[WHERE(data EQ fillvalue(0))] = !Values.F_NAN
+
+; Apply scale factor and offset.
+dataf=(scale(0))*(dataf-offset(0))
+
+; Get max and min value of data.
+datamin = min(dataf, /NAN)
+datamax = max(dataf, /NAN)
+
+; Get min/max value for lat and lon for zoomed image.
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+; Generate the plot.
+levels=254
+DEVICE, DECOMPOSED=0
+LoadCT,33, NCOLORS=levels, BOTTOM=1
+WINDOW, TITLE = 'FIELD:' + long_name(0) + '  '+'UNIT:'+units
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, $ 
+  POSITION=[0.05, 0.05, 0.82, 0.82], LIMIT=[latmin, lonmin, latmax, lonmax]
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_Colors=Indgen(levels)+3, $
+ Background=1, NLEVELS=levels, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+
+; Draw title and unit.
+XYOuts, 0.05, 0.86, /Normal, 'FIELD:' + long_name(0), $
+  Charsize=1.25, color=black, Alignment=0.0
+XYOuts, 0.82, 0.86, /Normal, 'UNIT:' + units, $ 
+  Charsize=1.25, Color=black, Alignment=1.0
+XYOuts, 0.43, 0.92, /Normal, FILE_NAME, $
+  Charsize=1.75, Color=black, Alignment=0.5
+
+; The following code is prepared for colorbar. 
+;
+;   If you require colorbar in your plot, you could download 
+; "Dr. Fanning's Coyote Library" from [1]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' ahead of coding. 
+;
+;    Add the coyote directory you create on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, Range=[datamin, datamax], Ncolors=levels, /Vertical, $
+ Position=[0.9,0.05,0.94,0.8], FORMAT='(F5.1)'
+
+; Reference
+; [1] Coyote's Guide to IDL Programming.
+;     http://www.dfanning.com/documents/programs.html
+

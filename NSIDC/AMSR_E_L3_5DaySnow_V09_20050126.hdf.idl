@@ -1,0 +1,178 @@
+;
+; This example code illustrates how to access and visualize an NSIDC AMSR_E
+; LAMAZ (EASE) Grid file in IDL.  EASE stands for "Equal-Area, Spherical Earth."
+; The EASE map projection is the same as the Lambert Azimuthal projection, 
+; known as "LAMAZ" to EOS.
+;
+; If you have any questions, suggestions, comments on this example, please use
+;  the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an example of any other NASA HDF/HDF-EOS data
+;  product that is not listed in the HDF-EOS Comprehensive Examples page
+;  (http://hdfeos.org/zoo), feel free to contact us at  eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Tested under: IDL 8.0
+; Last updated: 2018-12-18
+
+; Define  the file name, grid name, and data field name.
+FILE_NAME='AMSR_E_L3_5DaySnow_V09_20050126.hdf'
+GRID_NAME='Northern Hemisphere'
+DATAFIELD_NAME='SWE_NorthernPentad'
+
+; This data file has no 'units' attribute. Set it manually [1].
+unit='mm'
+
+; This data file has no 'long_name' attribute. Set it manually [1].
+long_name = GRID_NAME + ' 5-Day Snow Water Equivalent'
+
+; Open file via the EOS_GD interface.
+file_id = EOS_GD_OPEN(FILE_NAME)
+
+; Attach to the named grid.
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+
+; Retrieve grid info.
+status = EOS_GD_GRIDINFO(grid_id, xdimsize, ydimsize, upleft, lowrgt)
+; PRINT, upleft, lowrgt, xdimsize, ydimsize
+
+; Retrieve pojection info.
+status = EOS_GD_PROJINFO(grid_id, projcode, zonecode, spherecode, projparam)
+;PRINT, projcode, zonecode, spherecode, projparam
+
+; Retrieve data via the EOS_GD interface
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, data)
+
+; Detach from the grid.
+status = EOS_GD_DETACH(grid_id)
+
+; Close the EOS_GD interface to the file.
+status = EOS_GD_CLOSE(file_id)
+
+; The map projection for the data grid is Lambert Azimuthal (LAMAZ)
+;
+; There are two ways to geo-reference data.
+; 1) We can use the EOS2 Dumper generate 1D lat and lon.
+
+; Get the data field dimensions.
+;dimsize=size(data,/dim)
+;numlat=dimsize(0)
+;numlon=dimsize(1)
+
+;  Open the ASCII geolocation file and read the latitude data into a 1-D array.
+;LAT_FILENAME='lat_AMSR_E_L3_5DaySnow_V09_20050126.Northern_Hemisphere.output'
+;openr,1,LAT_FILENAME
+;size=numlat*numlon
+;ValInlat=FltArr(size)
+;READF,1,ValInlat
+;close,1
+
+;  Open the ASCII geolocation file and read the longitude data into a 1-D array.
+;LON_FILENAME='lon_AMSR_E_L3_5DaySnow_V09_20050126.Northern_Hemisphere.output'
+;openr,2,LON_FILENAME
+;size=numlat*numlon
+;ValInlon=FltArr(size)
+;EADF,2,ValInlon
+;close,2
+
+; Reform the lat/lon arrays to 2-D grids of same dimensions as the data field.
+; lat=FINDGEN(numlat,numlon)
+;lat=REFORM(ValInlat,numlat,numlon)
+
+;lon=FINDGEN(numlat,numlon)
+;lon=REFORM(ValInlon,numlat,numlon)
+
+; 2) We can use projection metadata information to generate lat and lon.
+; In IDL, GCTP starts from 100 and EOS_GD_PROJINFO returns 11 for
+; Lambert Azimuthal projection. IDL's Lambert Azimuthal projection code is 111. 
+projcode = 100+projcode
+
+clon = projparam[4]/1000000.0
+clat = projparam[5]/1000000.0
+
+; Please note that /GCTP must be specified. 
+mapStruct = MAP_PROJ_INIT(projcode, /GCTP, CENTER_LONGITUDE=clon, $
+                          CENTER_LATITUDE=clat)
+x0 = upleft(0)
+x1 = lowrgt(0)
+y0 = upleft(1)
+y1 = lowrgt(1)
+
+xinc = (x1 - x0 ) / xdimsize
+yinc = (y1 - y0 ) / ydimsize
+x = FINDGEN(xdimsize)*(xinc)  + x0
+y = FINDGEN(ydimsize)*(yinc)  + y0
+
+; Create mesh.
+xarr = x # Replicate(1, N_Elements(y))
+yarr = Replicate(1, N_Elements(x)) # y
+
+; See MAP_RPOJ_INVERSE IDL reference manual.
+; The function returns (2,n) array of lat/lon.
+result  = MAP_PROJ_INVERSE(xarr, yarr, MAP_STRUCTURE=mapStruct)
+lon1d = result[0,*]
+lat1d = result[1,*]
+
+; Re-match the dataset dimension.
+lat=Reform(lat1d,xdimsize,ydimsize)
+lon=Reform(lon1d,xdimsize,ydimsize)
+
+
+;  The following key information for color table is obtained from the
+; AMSR-E/Aqua L3 Global Snow Water Equivalent data product description at:
+;  http://nsidc.org/data/docs/daac/ae_swe_ease-grids.gd.html#format
+; Data values: 0-240 SWE divided by 2 (mm)
+;                241 non-validated
+;                247 incorrect spacecraft attitude
+;                248 off-earth
+;                252 land or snow impossible
+;                253 ice sheet
+;                254 water
+;                255 missing
+;
+;  We'll use 0-240 values only.
+dataf = FLOAT(data)
+idx=WHERE(dataf GT 240, cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+; Multiply by two according to data spec [1].
+dataf = 2 * dataf 
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+
+
+; Limit the plot to the Northern Hemisphere.
+;
+; This LAMAZ projection data spans over -90 to 90 and -180 and 180.
+; To get a zoomed effect, MAP_SET LIMIT option the lat max to -30
+latmin=0
+latmax=90
+lonmin=-180
+lonmax=180
+
+; Generate a plot.
+m = MAP('Lambert Azimuthal', $
+  LIMIT=[latmin, lonmin, latmax, lonmax], $
+  CENTER_LATITUDE=90.0, $
+  TITLE=file_name, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+
+; Do not use /FILL to handle fill values correctly on polar
+; stereographic projection.
+t1 = TEXT(0.35, 0.01, long_name)
+c1 = CONTOUR(dataf, lon, lat, OVERPLOT=m, $
+             /FILL, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees')
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1,  $
+              Position=[0.9,0.1,0.94,0.8], TITLE=unit)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600
+EXIT
+
+; References
+; [1] https://nsidc.org/data/ae_5dsno
+

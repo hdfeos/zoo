@@ -1,0 +1,127 @@
+; This example code illustrates how to access and visualize GESDISC
+; OMI Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Open file
+  file_name='OMI-Aura_L2-OMNO2_2008m0720t2016-o21357_v003-2008m0721t101450.he5'
+  file_id=H5F_OPEN(file_name)
+
+  datafield_name='/HDFEOS/SWATHS/ColumnAmountNO2/Data Fields/CloudFraction'
+  data_id=H5D_OPEN(file_id,datafield_name)
+
+  dataspace_id=H5D_GET_SPACE(data_id)
+  Dims=H5S_GET_SIMPLE_EXTENT_DIMS(dataspace_id)
+  Dims=float(Dims)
+
+  data=H5D_READ(data_id)
+
+; Read lat/lon
+  Lat_NAME='/HDFEOS/SWATHS/ColumnAmountNO2/Geolocation Fields/Latitude'
+  lat_id=H5D_OPEN(file_id,Lat_NAME)
+  lat=H5D_READ(lat_id)
+
+  Lon_NAME='/HDFEOS/SWATHS/ColumnAmountNO2/Geolocation Fields/Longitude'
+  lon_id=H5D_OPEN(file_id,Lon_NAME)
+ lon=H5D_READ(lon_id)
+
+; Retrieve units, missing value, scale_factor and offset
+  units_id=H5A_OPEN_NAME(data_id, 'Units')
+  units=H5A_READ(units_id)
+
+  slope_id=H5A_OPEN_NAME(data_id, 'ScaleFactor')
+  slope=H5A_READ(slope_id)
+
+  intercept_id=H5A_OPEN_NAME(data_id, 'Offset')
+  intercept=H5A_READ(intercept_id)
+
+  missingvalue_id=H5A_OPEN_NAME(data_id,'MissingValue')
+  missingvalue=H5A_READ(missingvalue_id)
+
+; Convert data type
+  dataf=float(data)
+  missingvaluef=float(missingvalue(0))
+
+  H5A_Close, missingvalue_id
+  H5D_Close, data_id
+
+; data transformation
+  dataf=(slope(0))*(dataf-intercept(0))
+  missingvaluef=(slope(0))*(missingvaluef-intercept(0))
+
+; Process missing value, convert dataf that are equal to missingvaluef to NaN
+  idx=where(dataf eq missingvaluef(0), cnt)
+  if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+; Process valid_range.
+  idx=WHERE(dataf LT valid_range(0) OR dataf GT valid_range(1), cnt)
+  IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Get max and min value of data for color bar.
+  datamin = MIN(dataf, /NAN)
+  datamax = MAX(dataf, /NAN)
+
+; Prepare field name title using long name attribute.
+  field = 'CloudFraction'
+  units = 'none'
+
+; Start off generating the plot
+  levels = 254
+  device, decomposed=0
+  LoadCT, 33, Ncolors=levels, Bottom=1
+  WINDOW, Title = 'FIELD:' + field + '   ' + 'UNIT:' + units, XSIZE=800, YSIZE=500
+  MAP_SET, /GRID, /CONTINENTS,XMARGIN=5, YMARGIN=5, $
+    POSITION=[0.05, 0.06, 0.82, 0.80]
+  CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+  MAP_GRID, /BOX_AXES, COLOR=255
+  MAP_CONTINENTS, COLOR=255
+
+; Draw file name, field name, and unit.
+  XYOUTS, 0.05, 0.86, /NORMAL, 'FIELD:' + field, $
+    CHARSIZE=1.25,  ALIGNMENT=0.0
+  XYOUTS, 0.94, 0.86, /NORMAL, 'UNIT:' + units, $ 
+    CHARSIZE=1.25,  ALIGNMENT=1.0
+  XYOUTS, 0.49, 0.92, /NORMAL, file_name, $
+    CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+; If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [1]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+; If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+; Add the coyote directory that you created on your machine to your IDL
+; path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; We assume that the coyote library is installed under the current working
+; directory that this code exists.
+  !PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+; If you don't need a color bar in your plot, you can ignore this step
+; by adding comment character ';' at the beginning of the code.
+  COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+   POSITION=[0.9,0.08,0.94,0.8], FORMAT='(F3.1)'
+
+; Write JPEG image file.
+  im = TVRD(TRUE=3)
+  jpg = 'OMI-Aura_L2-OMNO2_2008m0720t2016-o21357_v003-2008m0721t101450_CloudFraction.idl.JPG' 
+  WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; Reference
+;
+; [1] http://www.dfanning.com/documents/programs.html

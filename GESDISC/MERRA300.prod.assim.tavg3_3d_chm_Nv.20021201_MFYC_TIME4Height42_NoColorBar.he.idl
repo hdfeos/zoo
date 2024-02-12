@@ -1,0 +1,120 @@
+;This example code illustrates how to access and visualize GESDISC_MERRA Grid in IDL. 
+;If you have any questions, suggestions, comments  on this example, please use the HDF-EOS Forum (http://hdfeos.org/forums). 
+;If you would like to see an  example of any other NASA HDF/HDF-EOS data product that is not listed in the HDF-EOS Comprehensive Examples page (http://hdfeos.org/zoo), 
+;feel free to contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Refer to: MERRA300.prod.assim.tavg3_3d_chm_Nv.20021201.hdf
+; DataField name: MFYC
+
+; IDL example for reading GESDISC_MERRA Grid file
+
+; Open file
+file_name='MERRA300.prod.assim.tavg3_3d_chm_Nv.20021201.hdf'
+file_id = EOS_GD_OPEN(file_name)
+
+;Define Grid name
+grid_name='EOSGRID'
+
+;Define data field
+datafield_name='MFYC'
+
+;retrieve data
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+status = EOS_GD_READFIELD(grid_id, datafield_name, data)
+
+;Convert the M-D data to 2D data at TIME=4, Height=42
+data2D = data[*,*,42,4]
+data2D = Reform(data2D)
+
+;get fillvalue
+status=EOS_GD_GETFILLVALUE(grid_id, datafield_name, fillvalue)
+status = EOS_GD_DETACH(grid_id)
+
+;retrieve lat/lon
+grid_name='EOSGRID'
+datafield_name='XDim'
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+status = EOS_GD_READFIELD(grid_id, datafield_name, lon)
+status = EOS_GD_DETACH(grid_id)
+
+grid_name='EOSGRID'
+datafield_name='YDim'
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+status = EOS_GD_READFIELD(grid_id, datafield_name, lat)
+status = EOS_GD_DETACH(grid_id)
+status = EOS_GD_CLOSE(file_id)
+
+;retrieve units, scale facor and offset
+file_name='MERRA300.prod.assim.tavg3_3d_chm_Nv.20021201.hdf'
+newFileID=HDF_SD_START(file_name, /READ)
+
+datafield_name='MFYC'
+index = HDF_SD_NAMETOINDEX(newFileID, datafield_name)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+scalefactor_index=HDF_SD_ATTRFIND(thisSdsID, 'scale_factor')
+HDF_SD_ATTRINFO, thisSdsID, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(thisSdsID, 'add_offset')
+HDF_SD_ATTRINFO, thisSdsID, offset_index, DATA=offset
+
+HDF_SD_END, newFileID
+
+;Convert data type
+dataf=float(data2D)
+fillvaluef=float(fillvalue(0))
+
+;data transformation
+dataf=offset(0)+(scale_factor(0))*dataf
+fillvaluef=offset(0)+(scale_factor(0))*fillvaluef
+
+;Process fill values, convert data that are equal to fillvalue to NaN
+idx=where(dataf eq fillvaluef(0), cnt)
+;if cnt gt 0 then data2D[idx] = !Values.F_NAN
+
+;Process valid_range.
+idx=WHERE(dataf LT valid_range(0) OR dataf GT valid_range(1), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+;Since the data value for this field is too large to be handled by Dr. Fan's library. 
+;We do not provide routines of colorbar in this file. If you have solution for this problem, please contact us. 
+
+;Prepare field name title using long name attribute.
+field = 'Northward mass flux on C-Grid'
+units = 'Pa*m/s'
+
+; Generate a plot.
+levels = 254
+device, decomposed=0
+LoadCT, 33, Ncolors=levels, Bottom=1
+WINDOW, Title = 'FIELD:' + field + '  MFYC at TIME=4,Height=42' + '   ' + 'UNIT:' + units, XSIZE=800, YSIZE=500
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+  POSITION=[0.05, 0.06, 0.82, 0.80];, LIMIT=[latmin, -180, latmax, 180]   ; This line is prepared for global view
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+
+; Draw file name, field name, and unit.
+XYOUTS, 0.05, 0.86, /NORMAL, 'FIELD:' + field + '  MFYC at TIME=4,Height=42', $
+  CHARSIZE=1.25,  ALIGNMENT=0.0
+XYOUTS, 0.94, 0.86, /NORMAL, 'UNIT:' + units, $ 
+  CHARSIZE=1.25,  ALIGNMENT=1.0
+XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+  CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; Write JPEG image file.
+im = TVRD(TRUE=3)
+jpg = 'MERRA300.prod.assim.tavg3_3d_chm_Nv.20021201_MFYC_TIME4Height42_NoColorBar.idl.JPG' 
+WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; Reference
+;
+; [1] http://www.dfanning.com/documents/programs.html

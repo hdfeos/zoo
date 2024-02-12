@@ -1,0 +1,121 @@
+;
+;  This example code illustrates how to access and visualize 
+;  a ICESat-2 ATL15 netCDF-4/HDF5 Polar Stereo Grid file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl ATL14_AA_0314_100m_002_02.nc.idl
+;
+; Tested under: IDL 8.8.3
+; Last updated: 2023-05-09
+
+; Open file. 
+file_name='ATL15_AA_0314_01km_002_02.nc'
+file_id=NCDF_OPEN(file_name)
+parentId = NCDF_GROUPSINQ(file_id)
+; PRINT, NCDF_GROUPNAME(parentId[2])
+gid = parentId[2]
+
+; Read data.
+datafield_name='dhdt'
+data_id=NCDF_VARID(gid, datafield_name)
+
+; Retrieve data.
+NCDF_VARGET, gid, data_id, data
+
+data = data(*,*,0)
+
+; Get long_name.
+NCDF_ATTGET, gid, data_id, 'long_name', long_name
+long_name = STRING(long_name)
+; Get units.
+NCDF_ATTGET, gid, data_id, 'units', units
+units = STRING(units)
+
+; Get _FillValue.
+NCDF_ATTGET, gid, data_id, '_FillValue', fillvalue
+
+; Read latitude.
+latitude_name='y'
+latitude_id=NCDF_VARID(gid, latitude_name)
+NCDF_VARGET, gid, latitude_id, y
+
+; Read longitude.
+lon_name='x'
+longitude_id=NCDF_VARID(gid, lon_name)
+NCDF_VARGET, gid, longitude_id, x
+
+; Read time.
+t_name='time'
+t_id=NCDF_VARID(gid, t_name)
+NCDF_VARGET, gid, t_id, t
+NCDF_ATTGET, gid, t_id, 'units', units_t
+units_t = STRING(units_t)
+
+
+; Close file.
+NCDF_CLOSE, file_id
+
+
+; Process fill value.
+idx=where(data eq fillvalue(0), cnt)
+if cnt gt 0 then data[idx] = !Values.F_NAN
+
+; IDL's Polar Stereographic projection code is 106. 
+projcode = 106
+
+; https://epsg.io/3031
+; Please note that clat should be negative.
+clon = 0.0
+clat = -1915741.27 / 1000000.0
+
+; Create mesh.
+xarr = x # Replicate(1, N_Elements(y))
+yarr = Replicate(1, N_Elements(x)) # y
+
+; Please note that /GCTP must be specified. 
+mapStruct = MAP_PROJ_INIT(projcode, /GCTP, CENTER_LONGITUDE=clon, $
+                          CENTER_LATITUDE=clat, TRUE_SCALE_LATITUDE=-71)
+
+; See MAP_RPOJ_INVERSE IDL reference manual.
+; The function returns (2,n) array of lat/lon.
+result = MAP_PROJ_INVERSE(xarr, yarr, MAP_STRUCTURE=mapStruct)
+lon = result[0,*]
+lat = result[1,*]
+
+; Get max and min value of data.
+datamin = min(data, /NAN)
+datamax = max(data, /NAN)
+
+; Get min/max values for lat and lon.
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+m = MAP('Polar Stereographic', $
+  LIMIT=[latmin, lonmin, latmax, lonmax], $
+  CENTER_LATITUDE=-90.0, $
+  TITLE=file_name, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+
+label = long_name + ' on ' + STRING(t[0]) + ' ' + units_t
+t1 = TEXT(0.15, 0.01, label)
+c1 = SCATTERPLOT(lon, lat, OVERPLOT=m, $
+                 MAGNITUDE = data[*], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

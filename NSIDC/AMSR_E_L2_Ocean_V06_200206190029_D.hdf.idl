@@ -1,0 +1,88 @@
+; 
+;  This example code illustrates how to access and visualize NSIDC
+;  AMSR_E L2 Ocean HDF-EOS2 Swath file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl AMSR_E_L2_Ocean_V06_200206190029_D.hdf.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2018-09-24
+;
+; Define file name, swath name, and data field.
+FILE_NAME='AMSR_E_L2_Ocean_V06_200206190029_D.hdf'
+SWATH_NAME='Swath1'
+DATAFIELD_NAME='High_res_cloud'
+
+; Open file.
+file_id=EOS_SW_OPEN(FILE_NAME)
+
+; Attach Swath.
+swath_id=EOS_SW_ATTACH(file_id, SWATH_NAME)
+
+; Retrieve data.
+status=EOS_SW_READFIELD(swath_id,DATAFIELD_NAME,data)
+
+; Retrieve lat/lon.
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+
+; Detach Swath.
+status=EOS_SW_DETACH(swath_id)
+
+; Close file.
+status=EOS_SW_CLOSE(file_id)
+
+; Retrieve "Unit" and "Scale" attributes.
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+index = HDF_SD_NAMETOINDEX(newFileID, DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'Unit')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+scalefactor_index=HDF_SD_ATTRFIND(thisSdsID, 'Scale')
+HDF_SD_ATTRINFO, thisSdsID, scalefactor_index, DATA=scale_factor
+
+HDF_SD_END, newFileID
+
+; Read fill value directly from data.
+fillvalue=-9990
+
+; Convert data type.
+dataf=float(data)
+
+; Process fill value.
+dataf[WHERE(data EQ fillvalue)] = !Values.F_NAN
+
+; Apply scale factor. There's no offset attribute. See also [1].
+dataf=(scale_factor(0))*dataf
+
+; Get max and min value of data.
+datamin = min(dataf, /NAN)
+datamax = max(dataf, /NAN)
+
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+
+t1 = TEXT(0.35, 0.01, datafield_name)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

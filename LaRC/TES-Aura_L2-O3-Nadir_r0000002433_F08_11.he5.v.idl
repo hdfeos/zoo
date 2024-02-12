@@ -1,0 +1,194 @@
+;
+;  This example code illustrates how to access and visualize LaRC TES O3
+; HDF-EOS5 Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl TES-Aura_L2-O3-Nadir_r0000002433_F08_11.he5.v.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2019-11-05
+
+; Open file.
+FILE_NAME='TES-Aura_L2-O3-Nadir_r0000002433_F08_11.he5'
+FILE_ID=H5F_OPEN(FILE_NAME)
+
+; Read data.
+DATAFIELD_NAME='/HDFEOS/SWATHS/O3NadirSwath/Data Fields/O3'
+data_id=H5D_OPEN(FILE_ID,DATAFIELD_NAME)
+
+
+PRESSURE_NAME='/HDFEOS/SWATHS/O3NadirSwath/Data Fields/Pressure'
+pressure_id=H5D_OPEN(FILE_ID, PRESSURE_NAME)
+
+TIME_NAME='/HDFEOS/SWATHS/O3NadirSwath/Geolocation Fields/Time'
+time_id=H5D_OPEN(FILE_ID,TIME_NAME)
+
+dataspace_id=H5D_GET_SPACE(data_id)
+Dims=H5S_GET_SIMPLE_EXTENT_DIMS(dataspace_id)
+
+data_a=H5D_READ(data_id)
+pressure_a=H5D_READ(pressure_id)
+time=H5D_READ(time_id)
+
+
+; Read attributes.
+
+; Get title.
+long_name_id=H5A_OPEN_NAME(data_id, 'Title')
+long_name=H5A_READ(long_name_id)
+H5A_Close, long_name_id
+
+
+; Get units.
+units_id=H5A_OPEN_NAME(data_id, 'Units')
+units=H5A_READ(units_id)
+H5A_Close, units_id
+
+; Get title of pressure.
+long_name_id=H5A_OPEN_NAME(pressure_id, 'Title')
+long_name_p=H5A_READ(long_name_id)
+H5A_Close, long_name_id
+
+
+; Get units of pressure.
+units_id=H5A_OPEN_NAME(pressure_id, 'Units')
+units_p=H5A_READ(units_id)
+H5A_Close, units_id
+
+
+; Get missing value
+missingvalue_id=H5A_OPEN_NAME(data_id,'MissingValue')
+missingvalue=H5A_READ(missingvalue_id)
+
+missingvalue_p_id=H5A_OPEN_NAME(pressure_id, 'MissingValue')
+missingvalue_p=H5A_READ(missingvalue_p_id)
+
+; Close handles.
+H5A_Close, missingvalue_id
+H5A_Close, missingvalue_p_id
+H5D_Close, time_id
+H5D_Close, pressure_id
+H5D_Close, data_id
+
+; Process missing value, convert data that are equal to missingvalue to NaN
+idx=WHERE(data_a eq missingvalue(0), cnt)
+if cnt gt 0 then data_a[idx] = !Values.F_NAN
+
+idx=WHERE(pressure_a eq missingvalue_p(0), cnt)
+if cnt gt 0 then pressure_a[idx] = !Values.F_NAN
+
+
+; Subset data.
+data_1=data_a(*,55)
+pressure_1=pressure_a(*,55)
+
+data_2=data_a(*,155)
+pressure_2=pressure_a(*,155)
+
+data_3=data_a(*,955)
+pressure_3=pressure_a(*,955)
+
+data_4=data_a(*,1116)
+pressure_4=pressure_a(*,1116)
+
+
+; Time's unit is TAI-93.
+start_time = JULDAY(1,1,1993, 0, 0, 0)
+
+; Create X axis label.
+x_label = long_name + ' ('+ units + ')'
+
+; Create Y axis label.
+y_label = long_name_p + ' ('+ units_p + ')'
+
+; Create title label.
+t_label = long_name + ' at Time='
+
+; Generate the multiple plots.
+
+; Compute the date/time.
+sec = time(55) / 86400
+t = start_time + sec
+
+; Create a string out of date/time.
+CALDAT, t, Mo, D, Y, H, Mi, S
+tstring = STRING(Y, FORMAT='(I4)') + '-' + STRING(Mo, FORMAT='(I2.2)') + $
+  '-' + STRING(D, FORMAT='(I2.2)') + ' ' + STRING(H, FORMAT='(I2.2)') $ 
+  + ':' + STRING(Mi, FORMAT='(I2.2)') + ':' + STRING(S, FORMAT='(I2.2)')  
+
+; Reverse Y-axis for pressure using YRANGE.
+d_max=MAX(pressure_1)
+d_min=MIN(pressure_1)
+
+; Draw a line plot.
+p1 = PLOT(data_1, pressure_1, YTITLE=y_label, XTITLE=x_label, $
+          TITLE=t_label+tstring, /YLOG, XTICKFONT_SIZE=8, YTICKFONT_SIZE=8, $
+          LAYOUT=[2,2,1], YRANGE=[d_max, d_min], /BUFFER)
+
+; Compute the date/time.
+sec = time(155) / 86400
+t = start_time + sec
+
+; Create a string out of date/time.
+CALDAT, t, Mo, D, Y, H, Mi, S
+tstring = STRING(Y, FORMAT='(I4)') + '-' + STRING(Mo, FORMAT='(I2.2)') + $
+  '-' + STRING(D, FORMAT='(I2.2)') + ' ' + STRING(H, FORMAT='(I2.2)') $ 
+          + ':' + STRING(Mi, FORMAT='(I2.2)') + ':' + STRING(S, FORMAT='(I2.2)')
+
+d_max=MAX(pressure_2)
+d_min=MIN(pressure_2)
+
+p2 = PLOT(data_2, pressure_2, YTITLE=y_label, XTITLE=x_label, $
+          TITLE=t_label+tstring, /YLOG, XTICKFONT_SIZE=8, YTICKFONT_SIZE=8, $
+          LAYOUT=[2,2,2], YRANGE=[d_max, d_min], /BUFFER, /CURRENT)
+
+
+; Compute the date/time.
+sec = time(955) / 86400
+t = start_time + sec
+
+; Create a string out of date/time.
+CALDAT, t, Mo, D, Y, H, Mi, S
+tstring = STRING(Y, FORMAT='(I4)') + '-' + STRING(Mo, FORMAT='(I2.2)') + $
+  '-' + STRING(D, FORMAT='(I2.2)') + ' ' + STRING(H, FORMAT='(I2.2)') $ 
+  + ':' + STRING(Mi, FORMAT='(I2.2)') + ':' + STRING(S, FORMAT='(I2.2)')  
+
+d_max=MAX(pressure_3)
+d_min=MIN(pressure_3)
+
+p3 = PLOT(data_3, pressure_3, YTITLE=y_label, XTITLE=x_label, $
+          TITLE=t_label+tstring, /YLOG, XTICKFONT_SIZE=8, YTICKFONT_SIZE=8, $
+          LAYOUT=[2,2,3], YRANGE=[d_max, d_min], /BUFFER, /CURRENT)
+
+; Compute the date/time.
+sec = time(1116) / 86400
+t = start_time + sec
+
+; Create a string out of date/time.
+CALDAT, t, Mo, D, Y, H, Mi, S
+tstring = STRING(Y, FORMAT='(I4)') + '-' + STRING(Mo, FORMAT='(I2.2)') + $
+  '-' + STRING(D, FORMAT='(I2.2)') + ' ' + STRING(H, FORMAT='(I2.2)') $ 
+  + ':' + STRING(Mi, FORMAT='(I2.2)') + ':' + STRING(S, FORMAT='(I2.2)')  
+
+d_max=MAX(pressure_4)
+d_min=MIN(pressure_4)
+
+p4 = PLOT(data_4, pressure_4, YTITLE=y_label, XTITLE=x_label, $
+          TITLE=t_label+tstring, /YLOG, XTICKFONT_SIZE=8, YTICKFONT_SIZE=8, $
+          LAYOUT=[2,2,4], YRANGE=[d_max, d_min], /BUFFER, /CURRENT)
+t1 = TEXT(0.3, 0.5, FILE_NAME, /CURRENT)
+
+png = file_name + '.v.idl.png'
+p1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+
+

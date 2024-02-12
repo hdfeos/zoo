@@ -1,0 +1,167 @@
+; 
+; This example code illustrates how to access and visualize an NSIDC MODIS 25km
+; LAMAZ (EASE) Grid file in IDL.  EASE stands for "Equal-Area, Spherical Earth"
+; See reference [1], below.  The EASE map projection is the same as the Lambert
+; Azimuthal projection, known as "LAMAZ" to EOS.
+
+; If you have any questions, suggestions, comments on this example, please use
+;  the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an example of any other NASA HDF/HDF-EOS data
+;  product that is not listed in the HDF-EOS Comprehensive Examples page
+;  (http://hdfeos.org/zoo), feel free to contact us at
+;  eoshelp@hdfgroup.org or post it at the HDF-EOS Forum
+; (http://hdfeos.org/forums).
+;
+; Usage:save this script and run 
+; 
+; $idl NISE_SSMISF17_20110424.HDFEOS.s.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2019-05-02
+
+
+; Define  the file name, grid name, and data field name.
+FILE_NAME='NISE_SSMISF17_20110424.HDFEOS'
+GRID_NAME='Southern Hemisphere'
+DATAFIELD_NAME='Extent'
+
+; This data file has no 'units' attribute
+unit='none'
+
+; Open file via the EOS_GD interface.
+file_id = EOS_GD_OPEN(FILE_NAME)
+
+; Attach to the named grid.
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+
+; Retrieve grid info.
+status = EOS_GD_GRIDINFO(grid_id, xdimsize, ydimsize, upleft, lowrgt)
+
+; Retrieve pojection info.
+status = EOS_GD_PROJINFO(grid_id, projcode, zonecode, spherecode, projparam)
+
+; Retrieve data via the EOS_GD interface
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, data)
+
+; Detach from the grid.
+status = EOS_GD_DETACH(grid_id)
+
+; Close the EOS_GD interface to the file.
+status = EOS_GD_CLOSE(file_id)
+
+; This file contains Lambert Azimuthal projection. 
+
+; HDF-EOS2 returns 11. 
+projcode = projcode+100
+
+clon = projparam[4]/1000000.0
+clat = projparam[5]/1000000.0
+
+; Please note that /GCTP must be specified.
+mapStruct = MAP_PROJ_INIT(projcode, /GCTP, CENTER_LONGITUDE=clon, $
+                          CENTER_LATITUDE=clat)
+x0 = upleft(0)
+x1 = lowrgt(0)
+y0 = upleft(1)
+y1 = lowrgt(1)
+xinc = (x1 - x0 ) / xdimsize
+yinc = (y1 - y0 ) / ydimsize
+x = FINDGEN(xdimsize)*(xinc)  + x0
+y = FINDGEN(ydimsize)*(yinc)  + y0
+
+; Create mesh.
+xarr = x # Replicate(1, N_Elements(y))
+yarr = Replicate(1, N_Elements(x)) # y
+
+; See MAP_RPOJ_INVERSE IDL reference manual.
+; The function returns (2,n) array of lat/lon.
+result  = MAP_PROJ_INVERSE(xarr, yarr, MAP_STRUCTURE=mapStruct)
+lon1d = result[0,*]
+lat1d = result[1,*]
+
+; Reshape to match the dataset dimension.
+lat=Reform(lat1d,xdimsize,ydimsize)
+lon=Reform(lon1d,xdimsize,ydimsize)
+
+;  The following key information for color table is obtained from the
+; data field's "Key" attribute. You can check it using HDFView.
+;
+; data_grid_key = Data Value     Parameter
+;                 0              snow-free land
+;                 1-100          sea ice concentration percentage
+;                 101            permanent ice (Greenland, Antarctica)
+;                 102            not used
+;                 103            dry snow
+;                 104            wet snow
+;                 105-251        not used
+;                 252            mixed pixels at coastlines
+;                               (unable to reliably apply microwave algorithm)
+;                 253            suspect ice value
+;                 254            corners(undefined)
+;                 255            ocean
+data[WHERE(data GT 0 AND data LE 20)] = 1
+data[WHERE(data GT 20 AND data LE 40)] = 2
+data[WHERE(data GT 40 AND data LE 60)] = 3
+data[WHERE(data GT 60 AND data LE 80)] = 4
+data[WHERE(data GT 80 AND data LE 100)] = 5
+data[WHERE(data EQ 101)] = 6
+data[WHERE(data EQ 103)] = 7
+data[WHERE(data EQ 104)] = 8
+data[WHERE(data EQ 252)] = 9
+data[WHERE(data EQ 253)] = 10
+data[WHERE(data EQ 255)] = 11
+
+; Generate a plot.
+m = MAP('Lambert Azimuthal', CENTER_LATITUDE=-90, $
+        LIMIT = [-90, -180, -30, 180], $
+        TITLE=file_name, /BUFFER)
+levels = 12
+; Construct a color map which is close to the "Image Gallery" of NSIDC.
+; The first black (0,0,0) entry is for background(bg).
+; [0,   0,    0], $   ; bg
+ct = COLORTABLE([[0,   63,   0], $   ; 0
+                 [0,   0,    255], $ ; 1                 
+                 [0,   63,   255], $ ; 21
+                 [0,   127,  255], $ ; 41
+                 [0,   191,  255], $ ; 61
+                 [0,   255,  255], $ ; 81
+                 [100, 200,  255], $ ; 101
+                 [255, 255,  255], $ ; 103
+                 [127, 127,  127], $ ; 104
+                 [25,  25,   25],  $ ; 252
+                 [0,   0,    0], $   ; 253
+                 [0,   0,    127] $ ; 255                 
+                ],$                             
+                NCOLORS = levels, /TRANSPOSE)
+
+index = FINDGEN(levels)
+c1 = SCATTERPLOT(lon[*], lat[*], OVERPLOT=m, $
+                 MAGNITUDE=data[*], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+; You can check it using HDFView.
+C_labels=['snow-free!Cland', '1-20pct!CSea Ice', '21-40pct!CSea Ice', $
+          '41-60pct!CSea Ice', '61-80pct!CSea Ice', '81-100pct!CSea Ice', $
+          'permanent!Cice', 'dry snow', 'wet snow', $
+          'mixed!Cpixels at!Ccoastlines', 'suspect!Cice value', 'ocean']
+
+cb = COLORBAR(RGB_TABLE=ct, BORDER=1, RANGE=[0,12], $
+              TICKVALUES=FLOAT(index)+0.5, $
+              TICKNAME=C_labels, $
+              ORIENTATION=1, TEXTPOS=1,  $
+              Position=[0.84,0.1,0.90,0.8], TITLE=unit)
+t1 = TEXT(0.35, 0.05, DATAFIELD_NAME)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600
+EXIT
+
+; References
+;
+; [1] Near-Real-Time SSM/I-SSMIS EASE-Grid
+;     Daily Global Ice Concentration and Snow Extent
+;     http://nsidc.org/data/nise1.html
+
+

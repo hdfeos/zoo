@@ -1,0 +1,92 @@
+;
+;  This example code illustrates how to access and visualize PO.DAAC AQUARIUS
+; SSS L3 Grid HDF5 file in NCL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;                               
+; $idl Q2012034.L3m_DAY_SCI_V5.0_SSS_1deg.h5.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2019-10-21
+
+; Open file.
+file_name='Q2012034.L3m_DAY_SCI_V5.0_SSS_1deg.h5';
+file_id=H5F_OPEN(file_name)
+
+; Read file attributes.
+minval_id=H5A_OPEN_NAME(file_id, 'data_minimum')
+minval=H5A_READ(minval_id)
+H5A_Close, minval_id
+
+maxval_id=H5A_OPEN_NAME(file_id, 'data_maximum')
+maxval=H5A_READ(maxval_id)
+H5A_Close, maxval_id
+
+; Read data.
+datafield_name='/l3m_data'
+data_id=H5D_OPEN(file_id, datafield_name)
+data=H5D_READ(data_id)
+
+; Read fill value attribute.
+fill_value_id=H5A_OPEN_NAME(data_id, '_FillValue')
+fill_value=H5A_READ(fill_value_id)
+H5A_CLOSE, fill_value_id
+; fill_valuef=float(fill_value(0))
+
+; Close dataset.
+H5D_Close, data_id
+
+; Close file.
+H5F_Close, file_id
+
+; Convert type to double.
+dataf = float(data)
+
+; Filter data based on file attribute values as specified in [1].
+idx=where(data gt maxval, cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+idx=where(data lt minval, cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+idx=WHERE(dataf EQ fill_value, cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Retrieve dimension sizes of data.
+dimsize=size(dataf,/dim)
+numlat=dimsize(1)
+numlon=dimsize(0)
+
+; Generate simple lat/lon. 
+; It's simple 360 (lon) x 180 (lat) size grid.
+lat = 90.0 - (FINDGEN(numlat) + 0.5) 
+lon = (FINDGEN(numlon) + 0.5) - 180
+
+long_name = 'Sea Surface Salinity'
+units = 'psu'
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.35, 0.2, long_name)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+
+; References
+;
+; [1] https://podaac-tools.jpl.nasa.gov/drive/files/allData/aquarius/docs/v5/AQ-010-UG-0008_AquariusUserGuide_DatasetV5.0.pdf
+

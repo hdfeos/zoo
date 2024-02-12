@@ -1,0 +1,152 @@
+;  This example code illustrates how to access and visualize LP_DAAC MCD
+; Grid file in IDL. This file uses Sinusoidal projection.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Define file name, Grid name, and data field.
+FILE_NAME='MCD43B4.A2007193.h25v05.005.2007211152315.hdf'
+GRID_NAME='MOD_Grid_BRDF'
+DATAFIELD_NAME='Nadir_Reflectance_Band1'
+
+; Open file.
+file_id = EOS_GD_OPEN(FILE_NAME)
+
+; Attach Grid.
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+
+; Retrieve data.
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, data)
+
+; Detach Swath.
+status = EOS_GD_DETACH(grid_id)
+
+; Close file.
+status = EOS_GD_CLOSE(file_id)
+
+; Retrieve fillvalue, units, scale factor, and offset attributes.
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+index=HDF_SD_NAMETOINDEX(newFileID,DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+scale_index=HDF_SD_ATTRFIND(thisSdsID, 'scale_factor')
+HDF_SD_ATTRINFO, thisSdsID, scale_index, data=scale
+
+offset_index=HDF_SD_ATTRFIND(thisSdsID, 'add_offset')
+HDF_SD_ATTRINFO, thisSdsID, offset_index, data=offset
+
+Fillvalue_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, Fillvalue_index, data=fillvalue
+
+HDF_SD_END, newFileID
+
+; Convert data type.
+dataf=float(data)
+
+; Process fill value.
+dataf[WHERE(data EQ fillvalue(0))] = !Values.F_NAN
+
+; Apply scale factor and offset.
+dataf=(scale(0))*(dataf-offset(0))
+
+; Get max and min value of data.
+datamin = min(dataf, /NAN)
+datamax = max(dataf, /NAN)
+
+
+; The file contains SINSOID projection. 
+; We need to use eosdump to generate 1D lat and lon
+; For information on how to obtain the lat/lon data, see [1].
+
+; Retrieve dimension size of data.
+dimsize=size(data,/dim)
+numlat=dimsize(0)
+numlon=dimsize(1)
+
+openr,1,'lat_MCD43B4.A2007193.h25v05.005.2007211152315.output'
+size=numlat*numlon
+ValInlat=FltArr(size)
+READF,1,ValInlat
+
+lat=FINDGEN(numlat,numlon)
+lat=Reform(ValInlat,numlat,numlon)
+
+openr,2,'lon_MCD43B4.A2007193.h25v05.005.2007211152315.output'
+ValInlon=FltArr(size)
+READF,2,ValInlon
+
+lon=FINDGEN(numlat,numlon)
+lon=Reform(ValInlon,numlat,numlon)
+
+; Get min/max value for lat and lon.
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+; Generate the plot.
+levels=254
+DEVICE, DECOMPOSED=0
+LoadCT,33, NCOLORS=levels, BOTTOM=1
+WINDOW, TITLE = 'FIELD:' + DATAFIELD_NAME + '  '+'UNIT:'+units
+MAP_SET, /SINUSOIDAL, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+  LIMIT=[latmin, lonmin, latmax, lonmax], POSITION=[0.05, 0.05, 0.82, 0.82]
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_Colors=Indgen(levels)+3, $
+  Background=1, NLEVELS=levels, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+
+; Draw title and unit.
+XYOuts, 0.05, 0.86, /Normal, 'FIELD:' + DATAFIELD_NAME, $
+  Charsize=1.25, color=black, Alignment=0.0
+XYOuts, 0.82, 0.86, /Normal, 'UNIT:' + units, $ 
+  Charsize=1.25, Color=black, Alignment=1.0
+XYOuts, 0.43, 0.92, /Normal, FILE_NAME, $
+  Charsize=1.75, Color=black, Alignment=0.5
+
+; The following code is prepared for colorbar. 
+;
+;   If you require colorbar in your plot, you could download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' ahead of coding. 
+;
+;    Add the coyote directory you create on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, Range=[datamin, datamax], Ncolors=levels, /Vertical, $
+ Position=[0.9,0.05,0.94,0.8], FORMAT='(F5.2)'
+
+; Reference
+; [1]  http://hdfeos.org/zoo/note_non_geographic.php
+; [2] Coyote's Guide to IDL Programming.
+;     http://www.dfanning.com/documents/programs.html
+
+
+
+
+

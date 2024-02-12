@@ -1,0 +1,98 @@
+; This example code illustrates how to access and visualize GESDISC
+; TRMM Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; open file
+  file_name='GSSTFYC.2b.Year.1988_2008.he5'
+  file_id=H5F_OPEN(file_name)
+
+  datafield_name='/HDFEOS/GRIDS/NCEP/Data Fields/SST'
+  data_id=H5D_OPEN(file_id,datafield_name)
+
+  dataspace_id=H5D_GET_SPACE(data_id)
+  dims=H5S_GET_SIMPLE_EXTENT_dims(dataspace_id)
+  dims=float(dims)
+
+; Convert data type for division operator
+  lon_dims=dims(0)
+  lat_dims=dims(1)
+
+  data=H5D_READ(data_id)
+
+; Get units
+  units_id=H5A_OPEN_NAME(data_id, 'Units')
+  units=H5A_READ(units_id)
+
+; Get fillvalue
+  fillvalue_id=H5A_OPEN_NAME(data_id,'_FillValue')
+  fillvalue=H5A_READ(fillvalue_id)
+
+; Get longname
+  longname_id=H5A_OPEN_NAME(data_id,'LongName')
+  longname=H5A_READ(longname_id)
+
+; Convert data type
+  dataf=float(data)
+  fillvaluef=float(fillvalue(0))
+
+  H5A_Close, longname_id
+  H5A_Close, fillvalue_id
+  H5D_Close, data_id
+
+; Process fill values, convert data that are equal to fillvalue to NaN
+  idx=where(dataf eq fillvaluef(0), cnt)
+
+; Process valid_range.
+  idx=WHERE(dataf LT valid_range(0) OR dataf GT valid_range(1), cnt)
+  IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Get max and min value of data for color bar.
+  datamin = MIN(dataf, /NAN)
+  datamax = MAX(dataf, /NAN)
+
+; Calculate the latitude and longitude range based on vector points and lat/lon step
+  lat=FINDGEN(180)*(180.0/lat_dims)-90
+  lon=FINDGEN(360)*(360.0/lon_dims)-180
+
+; The following coding is prepared for colorbar. If you require colorbar in your plot, you could download Dr. 
+; Fan's Coyote Library from (http://www.dfanning.com/documents/programs.html). Make a directory named coyote 
+; somewhere on your machine, and extract the Coyote files into it. If color bar is not not necessary for your
+; plot, you can ignore this step and add comment character ';' ahead of coding. 
+; Add the coyote directory you create on your machine to your IDL path. 
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+  !PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; Start off generating the plot
+  levels = 254
+  device, decomposed=0
+  LoadCT, 33, Ncolors=levels, Bottom=1
+  WINDOW, title=file_name+' Yearly '+longname, XSIZE=800, YSIZE=500
+  ERASE, Color=white
+
+  MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, POSITION=[0.08, 0.12, 0.80, 0.80], /NOERASE
+  CONTOUR, dataf, lon, lat, /OVERPLOT, /Cell_FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+  MAP_CONTINENTS, COLOR=black
+  MAP_GRID, /BOX_AXES, COLOR=black
+  XYOuts, 0.08, 0.87, /Normal, 'Field:' + longname, Charsize=1.25, color=black, Alignment=0.0
+  XYOuts, 0.90, 0.87, /Normal, 'Unit:'+ units, Charsize=1.25, Color=black, Alignment=1.0
+  XYOuts, 0.46, 0.92, /Normal, file_name, Charsize=1.75, Color=black, Alignment=0.5
+  XYOuts, 0.08, 0.05, /Normal, 'NCEP/DOE Reanalysis II in HDF-EOS5', Charsize=1.10, color=black, Alignment=0.0
+; The following coding is to generate color bar if your already download and install Dr. Fanning's Coyote Library and add ; the coyote directory above. 
+; If you don't need color bar in your plot, you can ignore this step and add comment character ';' ahead of coding.
+  COLORBAR, Range=[datamin, datamax], Ncolors=levels, /Vertical, Position=[0.87,0.11,0.90,0.81]
+
+; Write JPEG image file.
+  im = TVRD(TRUE=3)
+  jpg = 'GSSTFYC.2b.Year.1988_2008_Yearly_SST.idl.JPG' 
+  WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; Reference
+;
+; [1] http://www.dfanning.com/documents/programs.html

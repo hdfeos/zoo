@@ -1,0 +1,96 @@
+;
+;  This example code illustrates how to access and visualize LaRC CALIPSO LIDAR
+; Level 2 PSC Mask HDF4 file in IDL. 
+;
+;  If you have any questions, suggestions, comments on this example, please use
+; the HDF-EOS Forum (http://hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or 
+; post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl CAL_LID_L2_PSCMask-Standard-V2-00.2021-03-26T00-00-00ZN.hdf.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2022-10-05
+
+
+; Open file.
+file_name='CAL_LID_L2_PSCMask-Standard-V2-00.2021-03-26T00-00-00ZN.hdf'
+
+fid = HDF_SD_START(file_name, /READ)
+
+data_name="PSC_Feature_Mask"
+index=HDF_SD_NAMETOINDEX(fid, data_name)
+
+; Read data.
+sds_id=HDF_SD_SELECT(fid, index)
+HDF_SD_GETDATA, sds_id, data
+
+; Read attribute.
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, 'fillvalue ')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'units ')
+HDF_SD_ATTRINFO, sds_id, units_index, data=units
+
+; Read lat.
+data_name="Latitude"
+index=HDF_SD_NAMETOINDEX(fid, data_name)
+sds_id=HDF_SD_SELECT(fid, index)
+HDF_SD_GETDATA, sds_id, lat
+
+; Read lon.
+data_name="Longitude"
+index=HDF_SD_NAMETOINDEX(fid, data_name)
+sds_id=HDF_SD_SELECT(fid, index)
+HDF_SD_GETDATA, sds_id, lon
+
+; Read altitude.
+data_name="Altitude"
+index=HDF_SD_NAMETOINDEX(fid, data_name)
+sds_id=HDF_SD_SELECT(fid, index)
+HDF_SD_GETDATA, sds_id, alt
+units_index=HDF_SD_ATTRFIND(sds_id, 'units ')
+HDF_SD_ATTRINFO, sds_id, units_index, data=units_alt
+
+; End access to SDS.
+HDF_SD_ENDACCESS, sds_id
+
+; Close file.
+HDF_SD_END, fid
+
+; Subset data.
+s = 120
+datas = data[s,*]
+
+; Process fill value.
+dataf = FLOAT(datas)
+idx=WHERE(datas EQ FIX(fillvalue), cnt)
+if cnt gt 0 then dataf[idx]=!Values.F_NAN
+
+; Set text about dataset.
+longname = 'PSC_Feature_Mask at Altitude=' + STRING(alt(s)) + units_alt
+
+datamin = MIN(dataf)
+datamax = MAX(dataf)
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+c1 = SCATTERPLOT(lon, lat, OVERPLOT=m, $
+                 MAGNITUDE = dataf, $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, longname)
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], ORIENTATION=1, BORDER=1,$
+              TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+; Save image.
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

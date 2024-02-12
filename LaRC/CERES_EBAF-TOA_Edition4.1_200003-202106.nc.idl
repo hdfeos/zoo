@@ -1,0 +1,70 @@
+;
+;  This example code illustrates how to access and visualize LaRC
+;  CERES EBAF TOA Edition 4.1 netCDF-3 Grid file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  %idl CERES_EBAF-TOA_Edition4.1_200003-202106.nc.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2021-10-25
+
+; Open file. 
+FILE_NAME='CERES_EBAF-TOA_Edition4.1_200003-202106.nc'
+file_id=NCDF_OPEN(FILE_NAME)
+
+; Define data field.
+DATAFIELD_NAME='toa_net_clr_c_mon'
+id=NCDF_VARID(file_id,DATAFIELD_NAME)
+
+; Retrieve data.
+NCDF_VARGET, file_id, id, data
+
+; Retrieve attributes. The data set has units, long_name, and
+; valid_range attributes.
+NCDF_ATTGET, file_id, id, 'units', units_a
+NCDF_ATTGET, file_id, id, 'long_name', long_name_a
+units=STRING(units_a)
+long_name=STRING(long_name_a)
+; Retrieve lat/lon.
+DATAFIELD_NAME="lat"
+id=NCDF_VARID(file_id,DATAFIELD_NAME)
+NCDF_VARGET, file_id, id, lat
+
+DATAFIELD_NAME="lon"
+id=NCDF_VARID(file_id,DATAFIELD_NAME)
+NCDF_VARGET, file_id, id, lon
+
+; Close file.
+NCDF_CLOSE, file_id
+
+; Convert the 3D data to 2D data at time=0.
+data2D=data[*,*,0]
+
+; Lon starts from 0. Shift. 
+lon = ((lon + 180) MOD 360) - 180
+
+; Get max and min value of data.
+datamin=min(data2D)
+datamax=max(data2D)
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+c1 = CONTOUR(data2D, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, long_name)
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, $
+              TEXTPOS=1, POSITION=[0.85,0.3,0.87,0.7], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, WIDTH=800, HEIGHT=600
+EXIT

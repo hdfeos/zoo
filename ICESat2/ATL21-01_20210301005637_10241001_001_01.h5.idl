@@ -1,0 +1,92 @@
+;
+;  This example code illustrates how to access and visualize ICESat-2
+; ATL21 L3B HDF5 file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Usage:
+;
+;  $idl ATL21-01_20210301005637_10241001_001_01.h5.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2021-08-11
+
+; Open file.
+file_name='ATL21-01_20210301005637_10241001_001_01.h5'
+file_id=H5F_OPEN(file_name)
+
+; Read latitude.
+latitude_name='/grid_lat'
+latitude_id=H5D_OPEN(file_id, latitude_name)
+lat=H5D_READ(latitude_id)
+
+; Close dataset.
+H5D_CLOSE, latitude_id
+
+; Read longitude.
+lon_name='/grid_lon'
+lon_id=H5D_OPEN(file_id, lon_name)
+lon=H5D_READ(lon_id)
+
+; Close dataset.
+H5D_CLOSE, lon_id
+
+
+; Read temperature.
+data_name='/monthly/mean_weighted_mss'
+data_id=H5D_OPEN(file_id, data_name)
+data=H5D_READ(data_id)
+
+; Read unit attribute.
+units_id=H5A_OPEN_NAME(data_id, 'units')
+units=H5A_READ(units_id)
+H5A_CLOSE, units_id
+
+; Read long name attribute.
+ln_id=H5A_OPEN_NAME(data_id, 'long_name')
+long_name=H5A_READ(ln_id)
+H5A_CLOSE, ln_id
+
+; Get '_FillValue' attribute.
+fv_id=H5A_OPEN_NAME(data_id, '_FillValue')
+fv=H5A_READ(fv_id)
+H5A_CLOSE, fv_id
+
+; Close dataset.
+H5D_CLOSE, data_id
+
+
+; Close file.
+H5F_CLOSE, file_id
+
+; Process fill value.
+data[WHERE(data EQ fv(0))] = !Values.F_NAN
+
+; Adjust lon value for polar stereo graphic projection.
+lon = lon - 180
+
+; Get min value for lat.
+latmin=min(lat)
+
+m = MAP('Polar Stereographic', $
+  LIMIT=[latmin, -180, 90, 180], $
+  CENTER_LATITUDE=90.0, $
+  TITLE=file_name, /BUFFER)
+ct = COLORTABLE(25)
+t1 = TEXT(0.35, 0.01, long_name)
+c1 = CONTOUR(data, lon, lat, OVERPLOT=m, $
+             /FILL, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees')
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, $
+              TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

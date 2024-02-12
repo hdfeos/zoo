@@ -1,0 +1,117 @@
+;
+; This example code illustrates how to access and visualize LAADS
+; VNP46A1 HDF-EOS5 Grid file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  %idl VNP46A1.A2020302.h07v07.001.2020303075447.h5.idl 
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2020-11-04
+
+; Open file.
+file_name = 'VNP46A1.A2020302.h07v07.001.2020303075447.h5'
+file_id = H5F_OPEN(file_name)
+
+datafield_name = '/HDFEOS/GRIDS/VNP_Grid_DNB/Data Fields/BrightnessTemperature_M12'
+data_id = H5D_OPEN(file_id, datafield_name)
+
+dataspace_id = H5D_GET_SPACE(data_id)
+Dims = H5S_GET_SIMPLE_EXTENT_DIMS(dataspace_id)
+Dims = float(Dims)
+
+; Get dimension sizes for lat/lon calculation.
+xdimsize = Dims(0)
+ydimsize = Dims(1)
+
+data = H5D_READ(data_id)
+
+; Get units attribute.
+units_id = H5A_OPEN_NAME(data_id, 'units')
+units = H5A_READ(units_id)
+H5A_Close, units_id
+
+; Get long_name attribute.
+long_name_id = H5A_OPEN_NAME(data_id, 'long_name')
+long_name = H5A_READ(long_name_id)
+H5A_Close, long_name_id
+
+; Get scale_factor attribute.
+scale_factor_id = H5A_OPEN_NAME(data_id, 'scale_factor')
+scale_factor = H5A_READ(scale_factor_id)
+H5A_Close, scale_factor_id
+
+; Get add_offset attribute.
+add_offset_id = H5A_OPEN_NAME(data_id, 'add_offset')
+add_offset = H5A_READ(add_offset_id)
+H5A_Close, add_offset_id
+
+; Get missing value attribute.
+fillvalue_id = H5A_OPEN_NAME(data_id, '_FillValue')
+fillvalue = H5A_READ(fillvalue_id)
+
+; Convert data type.
+dataf = float(data)
+fillvaluef = float(fillvalue(0))
+H5A_CLOSE, fillvalue_id
+H5D_CLOSE, data_id
+
+; Process missing value, convert dataf that are equal to fillvaluef to NaN
+idx = where(dataf eq fillvaluef(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+dataf=(scale_factor(0))*(dataf)+add_offset(0)
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; Calculate the latitude and longitude range based on bounding box.
+g_id = H5G_OPEN(file_id, '/HDFEOS/GRIDS/VNP_Grid_DNB')
+x_id = H5A_OPEN_NAME(g_id, 'WestBoundingCoord')
+x = H5A_READ(x_id)
+x0 = x(0)
+H5A_CLOSE, x_id
+
+x_id = H5A_OPEN_NAME(g_id, 'EastBoundingCoord')
+x = H5A_READ(x_id)
+x1 = x(0)
+H5A_CLOSE, x_id
+
+x_id = H5A_OPEN_NAME(g_id, 'NorthBoundingCoord')
+x = H5A_READ(x_id)
+y0 = x(0)
+H5A_CLOSE, x_id
+
+x_id = H5A_OPEN_NAME(g_id, 'SouthBoundingCoord')
+x = H5A_READ(x_id)
+y1 = x(0)
+H5A_CLOSE, x_id
+H5G_CLOSE, g_id
+H5F_CLOSE, file_id
+
+xinc = (x1 - x0 ) / xdimsize
+yinc = (y1 - y0 ) / ydimsize
+lon = FINDGEN(xdimsize)*(xinc)  + x0
+lat = FINDGEN(ydimsize)*(yinc)  + y0
+
+; Prepare field name title using long name attribute.
+
+m = MAP('Geographic', TITLE=file_name, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.35, 0.01, long_name)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

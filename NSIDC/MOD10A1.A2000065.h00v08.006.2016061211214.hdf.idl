@@ -1,0 +1,166 @@
+;
+;  This example code illustrates how to access and visualize NSIDC MODIS
+; Grid file in IDL. This Grid file uses Sinusoidal projection.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+; $idl MOD10A1.A2000065.h00v08.006.2016061211214.hdf.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2019-02-21
+;
+; Define file name, grid name, and data field.
+FILE_NAME='MOD10A1.A2000065.h00v08.006.2016061211214.hdf'
+GRID_NAME='MOD_Grid_Snow_500m'
+DATAFIELD_NAME='NDSI_Snow_Cover'
+
+; Open file.
+file_id = EOS_GD_OPEN(FILE_NAME)
+
+; Retrieve data.
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+
+; Retrieve grid info.
+status = EOS_GD_GRIDINFO(grid_id, xdimsize, ydimsize, upleft, lowrgt)
+; PRINT, upleft, lowrgt, xdimsize, ydimsize
+
+; Retrieve pojection info.
+status = EOS_GD_PROJINFO(grid_id, projcode, zonecode, spherecode, projparam)
+; PRINT, projcode, zonecode, spherecode, projparam
+
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, data)
+
+; Close file.
+status = EOS_GD_DETACH(grid_id)
+status = EOS_GD_CLOSE(file_id)
+
+; Retrieve attributes using HDF_SD_...() routines because they are not
+; accessible through EOS_GD_...() APIs.
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+index=HDF_SD_NAMETOINDEX(newFileID,DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+long_name_index=HDF_SD_ATTRFIND(thisSdsID, 'long_name')
+HDF_SD_ATTRINFO, thisSdsID, long_name_index, DATA=long_name
+
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=unit
+
+Fillvalue_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, Fillvalue_index, data=fillvalue
+
+HDF_SD_END, newFileID
+
+; Convert data type.
+dataf=float(data)
+
+; If you want to apply fill value above, replace the below "data" with
+; "dataf" below and adjust the plot and color bar at the bottom of
+; this code.
+data_unique = data[UNIQ(data, SORT(data))]
+
+; Check what discrete "Key" values are used to determine color table
+; and discrete color bar.
+PRINT, data_unique
+
+dimsize_data_unique = size(data_unique,/dim)
+
+; HDF-EOS2 returns 16. IDL Sinusoidal code is 116.
+projcode = projcode+100
+
+; Please note that /GCTP must be specified. 
+mapStruct = MAP_PROJ_INIT(projcode, /GCTP)
+x0 = upleft(0)
+x1 = lowrgt(0)
+y0 = upleft(1)
+y1 = lowrgt(1)
+
+xinc = (x1 - x0 ) / xdimsize
+yinc = (y1 - y0 ) / ydimsize
+x = FINDGEN(xdimsize)*(xinc)  + x0
+y = FINDGEN(ydimsize)*(yinc)  + y0
+
+; Create mesh.
+xarr = x # Replicate(1, N_Elements(y))
+yarr = Replicate(1, N_Elements(x)) # y
+
+; See MAP_RPOJ_INVERSE IDL reference manual.
+; The function returns (2,n) array of lat/lon.
+result  = MAP_PROJ_INVERSE(xarr, yarr, MAP_STRUCTURE=mapStruct)
+lon1d = result[0,*]
+lat1d = result[1,*]
+
+; Re-match the dataset dimension.
+lat=Reform(lat1d,xdimsize,ydimsize)
+lon=Reform(lon1d,xdimsize,ydimsize)
+
+; Adjust lon value to visualize map in zoomed image properly along 180.
+r = where((lon LE 0), count)
+lon(r) = lon(r) + 360
+
+; Get min/max value of lat and lon for zoomed image.
+latmin=MIN(lat) - 20
+latmax=MAX(lat) + 20
+lonmin=MIN(lon) - 20
+lonmax=MAX(lon) + 20
+
+; Generate a plot.
+m = MAP('Sinusoidal', $
+        LIMIT=[latmin, lonmin, latmax, lonmax], $
+        TITLE=file_name, /BUFFER)
+
+; Construct color table based on the following assignment:
+;
+; Key R   G   B     Name
+; 0   0   0   0    Snow 0
+; 1   0   0   255  Ocean
+; 2   225 225 255  Fill
+levels = 2
+ct = COLORTABLE([[0,   0,   255], $
+                 [0,  255,  255], $
+                 [0,   0,   255]], $
+                NCOLORS = levels, /TRANSPOSE)
+
+t1 = TEXT(0.35, 0.01, long_name)
+
+; Remap data for discrete color bar.
+idx=WHERE(data EQ 239, cnt)
+dataf[idx] = 1
+idx=WHERE(data EQ 255, cnt)
+dataf[idx] = 2
+
+; Subset for fast plotting.
+datas = dataf[0:*:100, 0:*:100]
+lons = lon[0:*:100, 0:*:100]
+lats = lat[0:*:100, 0:*:100]
+index = [0,1,2]
+c1 = CONTOUR(datas, $
+             lons, $
+             lats, $
+             OVERPLOT=m, $
+             RGB_INDICES=index, C_VALUE=index, $
+             N_LEVELS = levels, $
+             /FILL, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees')
+
+mc = MAPCONTINENTS()
+cb = COLORBAR(RGB_TABLE=ct, BORDER=1, RANGE=[0,2], $
+              TICKVALUES=[0.5, 1.5], $
+              TICKNAME=['ocean', 'fill'], $              
+              ORIENTATION=1, TEXTPOS=1,  $
+              Position=[0.9,0.1,0.94,0.8], TITLE=unit)
+t2 = TEXT(0.9, 0.82, unit)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600
+EXIT

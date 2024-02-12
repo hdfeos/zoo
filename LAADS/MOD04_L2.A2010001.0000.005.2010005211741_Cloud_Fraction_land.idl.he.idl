@@ -1,0 +1,126 @@
+;This example code illustrates how to access and visualize LAADS_MOD swath file in IDL. If you have any questions, suggestions, comments  on this example, please use the HDF-EOS Forum (http://hdfeos.org/forums). If you would like to see an  example of any other NASA HDF/HDF-EOS data product that is not listed in the HDF-EOS Comprehensive Examples page (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Refer to: MOD04_L2.A2010001.0000.005.2010005211741.hdf
+; DataField name: Cloud_Fraction_Land
+
+; IDL example for reading LAADS_MOD Swath.
+; Open file
+FILE_NAME='MOD04_L2.A2010001.0000.005.2010005211741.hdf'
+
+; Define swath name
+SWATH_NAME='mod04'
+file_id=EOS_SW_OPEN(FILE_NAME)
+swath_id=EOS_SW_ATTACH(file_id, SWATH_NAME)
+
+; Define datafield name
+DATAFIELD_NAME='Cloud_Fraction_Land'
+
+;retrieve data
+status=EOS_SW_READFIELD(swath_id,DATAFIELD_NAME,data)
+
+;retrieve lat/lon
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+
+;retrieve fillvalue
+status=EOS_SW_GETFILLVALUE(swath_id,DATAFIELD_NAME, fillvalue)
+
+;close file
+status=EOS_SW_DETACH(swath_id)
+status=EOS_SW_CLOSE(file_id)
+
+;retrieve units and scale
+FILE_NAME='MOD04_L2.A2010001.0000.005.2010005211741.hdf'
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+DATAFIELD_NAME='Cloud_Fraction_Land'
+index = HDF_SD_NAMETOINDEX(newFileID, DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+scalefactor_index=HDF_SD_ATTRFIND(thisSdsID, 'scale_factor')
+HDF_SD_ATTRINFO, thisSdsID, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(thisSdsID, 'add_offset')
+HDF_SD_ATTRINFO, thisSdsID, offset_index, DATA=offset
+
+;retrive fillvalue of lat/lon
+DATAFIELD_NAME='Longitude'
+index = HDF_SD_NAMETOINDEX(newFileID, DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+lonfil_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, lonfil_index, DATA=fillvalue_lon
+
+DATAFIELD_NAME='Latitude'
+index = HDF_SD_NAMETOINDEX(newFileID, DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+latfil_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, latfil_index, DATA=fillvalue_lat
+
+HDF_SD_END, newFileID
+
+; Convert data type
+data=float(data)
+fillvalue=float(fillvalue)
+
+;data transformation
+data=(scale_factor(0))*(data-offset(0))
+fillvalue=(scale_factor(0))*(fillvalue-offset(0))
+
+;get max and min value of data
+idx=where(data ne fillvalue(0), cnt)
+if cnt gt 0 then datamin=min(data[idx])
+if cnt gt 0 then datamax=max(data[idx])
+
+; Process fill values, convert data that are equal to fillvalue to NaN
+idx=where(data eq fillvalue(0), cnt)
+;if cnt gt 0 then data[idx] = !Values.F_NAN
+
+;get max and min value of lon
+idx=where(lon ne fillvalue_lon(0), cnt)
+if cnt gt 0 then lonmin=min(lon[idx])
+if cnt gt 0 then lonmax=max(lon[idx])
+
+; Process fill values of longitude, convert data that are equal to fillvalue to NaN
+idx=where(lon eq fillvalue_lon(0), cnt)
+if cnt gt 0 then lon[idx] = !Values.F_NAN
+
+;get max and min value of lat
+idx=where(lat ne fillvalue_lat(0), cnt)
+if cnt gt 0 then latmin=min(lat[idx])
+if cnt gt 0 then latmax=max(lat[idx])
+
+; Process fill values of latitude, convert data that are equal to fillvalue to NaN
+idx=where(lat eq fillvalue_lon(0), cnt)
+;if cnt gt 0 then lat[idx] = !Values.F_NAN
+
+;The following coding is prepared for colorbar. If you require colorbar in your plot, you could download Dr. Fan's Coyote Library from (http://www.dfanning.com/documents/programs.html). Make a directory named coyote somewhere on your machine, and extract the Coyote files into it. If color bar is not not necessary for your plot, you can ignore this step and add comment character ';' ahead of coding. 
+;Add the coyote directory you create on your machine to your IDL path. !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+!PATH=Expand_Path('+/mnt/hdf/ziying-li/coyote/')+':'+!PATH
+
+; Start off generating the plot
+levels = 254
+device, decomposed=0
+LoadCT, 33, Ncolors=levels, Bottom=1
+WINDOW, title='Cloud Fraction Land'+'  '+'units:'+units, XSIZE=800
+;The following two lines are provided for different map_set. You can just comment the line you don't need and keep the other one
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, POSITION=[0.05, 0.05, 0.82, 0.95], LIMIT=[latmin, lonmin, latmax, lonmax]
+MAP_SET, /stereo, -90,0, /ISOTROPIC, /CONTINENTS, XMARGIN=5, YMARGIN=5, POSITION=[0.05, 0.05, 0.82, 0.95], LIMIT=[latmin, lonmin, latmax, lonmax]    ;Parameter 'LIMIT' specifies the limits of the map. If you would like to zoom in the plot, you could remove the comment character ';' ahead of it.
+CONTOUR, data, lon, lat, /OVERPLOT, /FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+;MAP_GRID, /BOX_AXES, COLOR=255    ; This routine is prepared for geographic map set
+MAP_GRID, /label, COLOR=255    ;This routine is prepared for stereo map set
+MAP_CONTINENTS, COLOR=255
+;The following coding is to generate color bar if your already download and install Dr. Fan's Coyote Library and add the coyote directory above. 
+;If you don't need color bar in your plot, you can ignore this step and add comment character ';' ahead of coding.
+;Because of the limitation of this routine, the color bar can not display properly in this case.
+COLORBAR, Range=[datamin, datamax], Ncolors=levels, /Vertical, Position=[0.9,0.1,0.94,0.9]
+
+
+

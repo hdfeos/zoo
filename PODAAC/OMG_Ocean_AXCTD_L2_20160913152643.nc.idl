@@ -1,0 +1,101 @@
+;
+;  This example code illustrates how to access and visualize PO.DAAC
+;  OMG AXCTD L2 file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl OMG_Ocean_AXCTD_L2_20160913152643.nc.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2019-09-18
+
+; Open file.
+FILE_NAME='OMG_Ocean_AXCTD_L2_20160913152643.nc'
+FILE_ID=H5F_OPEN(FILE_NAME)
+
+; Read data.
+DATAFIELD_NAME='/temperature'
+data_id=H5D_OPEN(FILE_ID, DATAFIELD_NAME)
+
+DEPTH_NAME='/depth'
+depth_id=H5D_OPEN(FILE_ID, DEPTH_NAME)
+
+LAT_NAME='/lat'
+lat_id=H5D_OPEN(FILE_ID, LAT_NAME)
+
+LON_NAME='/lon'
+lon_id=H5D_OPEN(FILE_ID, LON_NAME)
+
+dataspace_id=H5D_GET_SPACE(data_id)
+Dims=H5S_GET_SIMPLE_EXTENT_DIMS(dataspace_id)
+
+data=H5D_READ(data_id)
+depth=H5D_READ(depth_id)
+lat=H5D_READ(lat_id)
+lon=H5D_READ(lon_id)
+
+; Read attributes.
+long_name_id=H5A_OPEN_NAME(data_id, 'long_name')
+long_name=H5A_READ(long_name_id)
+H5A_Close, long_name_id
+
+units_id=H5A_OPEN_NAME(data_id, 'units')
+units=H5A_READ(units_id)
+H5A_Close, units_id
+
+long_name_id_d=H5A_OPEN_NAME(depth_id, 'long_name')
+long_name_d=H5A_READ(long_name_id_d)
+H5A_Close, long_name_id_d
+
+units_id_d=H5A_OPEN_NAME(depth_id, 'units')
+units_d=H5A_READ(units_id_d)
+H5A_Close, units_id_d
+
+
+; Get fill value.
+fv_id=H5A_OPEN_NAME(data_id,'_FillValue')
+fv=H5A_READ(fv_id)
+H5A_Close, fv_id
+
+; Close handles.
+H5D_Close, lat_id
+H5D_Close, lon_id
+H5D_Close, depth_id
+H5D_Close, data_id
+
+; Process missing value, convert data that are equal to missingvalue to NaN
+idx=WHERE(data eq fv(0), cnt)
+if cnt gt 0 then data[idx] = !Values.F_NAN
+
+; Create X axis label.
+x_label = long_name + ' ('+ units + ')'
+
+; Create Y axis label.
+y_label = long_name_d + ' ('+ units_d + ')'
+
+; Create title label.
+t_label = file_name + '!C!C Location: '
+lat_s = STRTRIM(STRING(lat[0,0]), 1)
+lon_s = STRTRIM(STRING(lon[0,0]), 1)
+t_label = t_label + 'lat=' + lat_s + ' and lon='+ lon_s
+
+; Reverse Y-axis for depth.
+d_max=MAX(depth[*,0])
+d_min=MIN(depth[*,0])
+
+; Draw a line plot.
+p = PLOT(data[*,0], depth[*,0], YTITLE=y_label, XTITLE=x_label, TITLE=t_label, $
+         XTICKFONT_SIZE=8, YTICKFONT_SIZE=8, YRANGE=[d_max, d_min] ,/BUFFER)
+png = file_name + '.idl.png'
+p.save, png, HEIGHT=600, WIDTH=800
+EXIT
+
+

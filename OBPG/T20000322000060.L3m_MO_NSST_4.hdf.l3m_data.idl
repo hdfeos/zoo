@@ -1,0 +1,193 @@
+; This example code illustrates how to access and visualize an OBPG MODIS-T 
+; file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, please use
+; the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS data
+; product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo),
+; feel free to contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS
+; Forum (http://hdfeos.org/forums).
+
+
+; Please note that this file is not an HDF-EOS type.
+; It contains neither HDF-EOS Grid nor Swath data. Both EOS_GD_ATTACH() and
+; EOS_SW_ATTACH() will fail.  We must use only HDF_SD interface to
+; access the data.
+
+; Define file name and data field.
+file_name='T20000322000060.L3m_MO_NSST_4.hdf'
+datafield_name='l3m_data'
+
+; Initialize the HDF_SD interface.
+sds_file_id=HDF_SD_START(file_name, /READ)
+
+; Get the index of the data field.
+datafield_index = HDF_SD_NAMETOINDEX(sds_file_id, datafield_name)
+
+; Attach to the data field.
+sds_field_id = HDF_SD_SELECT(sds_file_id, datafield_index)
+
+; Read the type and dimension info.
+HDF_SD_GETINFO,sds_field_id, NDIMS=ndims, DIMS=dims, TYPE=sd_type
+
+; Read the data from field.
+HDF_SD_GETDATA, sds_field_id, data_raw
+dimsize=size(data_raw,/dim)
+numlon=dimsize(0)
+numlat=dimsize(1)
+
+
+; Obtain the geo-location information from metadata written as file
+; attributes.
+;
+; The file attributes are inaccessible to the HDF_SD interface
+; but we can obtain them using HDFView.
+;
+; Map Projection = 'Equidistant Cylindrical'
+;  'Northernmost Latitude' = 90.0
+maxlat = 90.0
+;  'Southernmost Latitude' = -90.0
+minlat = -90.0
+;  'Westernmost Longitude' = -180.0
+minlon = -180.0
+;  'Easternmost Longitude' = 180.0
+maxlon = 180.0
+; 'Measure'
+measure='Mean'
+; 'Parameter'
+parameter = 'Sea Surface Temperature'
+; 'Units'
+units='deg-C'
+
+; Read the data field scale and offset information.
+scale_eq_index = HDF_SD_ATTRFIND(sds_field_id, 'Scaling Equation')
+HDF_SD_ATTRINFO, sds_field_id, scale_eq_index, data=scale_eq_string
+
+slope_index=HDF_SD_ATTRFIND(sds_field_id, 'Slope')
+HDF_SD_ATTRINFO, sds_field_id, slope_index, data=scale
+
+intercept_index=HDF_SD_ATTRFIND(sds_field_id, 'Intercept')
+HDF_SD_ATTRINFO, sds_field_id, intercept_index, data=offset
+
+; Terminate access to the data field.
+HDF_SD_ENDACCESS, sds_field_id
+; Close the HDF_SD interfac.
+HDF_SD_END, sds_file_id
+
+; Convert input data type 'BYTE' to float.
+dataf = float(data_raw)
+
+; Process fill value.
+; The value 65535 is directly obtained from the data using
+; print, data_raw(0,0)
+fillvalue = 65535
+
+idx=where(data_raw eq fillvalue, cnt)
+if cnt gt 0 then dataf[idx]=!Values.F_NAN
+;
+; Apply scale and offset to the data according to the scaling equation:
+; '(Slope*l3m_data) + Intercept = Parameter value'
+;
+; If you don't put "(0)" in "scale" and "offset" like the following
+;
+;  dataf = scale*dataf+offset
+;
+; the "dataf" will become one point.
+dataf = scale(0)*dataf+offset(0)
+
+; Create the geolocation coordinates for the map.
+lat_range = maxlat - minlat
+lon_range = maxlon - minlon
+
+; If sub-sampling is desired to generate a plot quickly, 
+; change the following value to a bigger number such as 10.
+stride=1
+nrows=numlat/stride
+ncols=numlon/stride
+lat=FINDGEN(ncols,nrows)
+lon=FINDGEN(ncols,nrows)
+dataf_plot = FINDGEN(ncols,nrows)
+
+FOR row=0,nrows-1 DO $
+  FOR col=0,ncols-1 DO $
+  lat[col,row]=minlat+(nrows-row-1)*lat_range/nrows 
+
+FOR row=0,nrows-1 DO $
+  FOR col=0,ncols-1 DO $
+  lon[col,row]=minlon+col*lon_range/ncols 
+
+FOR row=0,nrows-1 DO $
+  FOR col=0,ncols-1 DO $
+  dataf_plot[col,row]=dataf[col*stride, row*stride]
+
+datamin=MIN(dataf_plot, /NAN)
+datamax=MAX(dataf_plot, /NAN)
+
+
+; Append the meaningful field name according to [1].
+field = datafield_name + ' ('+ parameter + ')'
+
+; Generate the plot.
+levels=254
+DEVICE,DECOMPOSED=0
+LOADCT,33, NCOLORS=levels, BOTTOM=1
+WINDOW, TITLE = 'FIELD:' + field + '  '+'UNIT:'+units
+
+; Set the map parameters.
+; Since Map Projection = 'Equidistant Cylindrical', you may want to
+; try IDL map projection MILLER_CYLINDRICAL, which is Equidistant.
+; MAP_SET, /MILLER_CYLINDRICAL, /ISOTROPIC, /CONTINENTS, XMARGIN=5, YMARGIN=5,$
+;         POSITION=[0.05, 0.05, 0.82, 0.82]
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+         POSITION=[0.05, 0.05, 0.82, 0.82]
+CONTOUR, dataf_plot, lon, lat, /OVERPLOT, /CELL_FILL, BACKGROUND=1, $
+         NLEVELS=levels, COLOR=Black, C_COLORS=Indgen(levels)+1
+MAP_GRID, /LABEL, /BOX_AXES, COLOR=255
+MAP_CONTINENTS
+
+; Draw file name, field name, and unit.
+XYOUTS, 0.05, 0.86, /NORMAL, 'FIELD:' + field, $
+  CHARSIZE=1.25,  ALIGNMENT=0.0
+XYOUTS, 0.94, 0.86, /NORMAL, 'UNIT:' + units, $ 
+  CHARSIZE=1.25,  ALIGNMENT=1.0
+XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+  CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+;   If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+;   Add the coyote directory that you created on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+;   We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need a color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+ POSITION=[0.9,0.05,0.94,0.8], FORMAT='(F5.2)'
+
+; Write JPEG image file.
+im = TVRD(TRUE=3)
+jpg = file_name + '.' + datafield_name + '.idl.jpg'
+WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; Reference
+;
+; [1] http://oceancolor.gsfc.nasa.gov/DOCS/Ocean_Level-3_SMI_Products.pdf
+; [2] http://www.dfanning.com/documents/programs.html

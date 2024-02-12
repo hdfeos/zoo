@@ -1,0 +1,116 @@
+;  This example code illustrates how to access and visualize LaRC
+;  CERES EBAF HDF4 file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Refer to: CERES_EBAF_TOA_Terra_Edition1A_200003-200510.nc.hdf
+; DataField name: netclr
+
+; Open file. 
+FILE_NAME='CERES_EBAF_TOA_Terra_Edition1A_200003-200510.nc.hdf'
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+; Define data field.
+DATAFIELD_NAME="netclr"
+index=HDF_SD_NAMETOINDEX(newFileID,DATAFIELD_NAME)
+
+; Retrieve data.
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+HDF_SD_GETDATA, thisSdsID, data
+
+; Retrieve attributes. The data set has units, long_name, and
+; valid_range attributes.
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+long_name_index=HDF_SD_ATTRFIND(thisSdsID, 'long_name')
+HDF_SD_ATTRINFO, thisSdsID, long_name_index, DATA=long_name
+
+; Retrieve lat/lon.
+DATAFIELD_NAME="lat"
+index=HDF_SD_NAMETOINDEX(newFileID,DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+HDF_SD_GETDATA, thisSdsID, lat
+
+DATAFIELD_NAME="lon"
+index=HDF_SD_NAMETOINDEX(newFileID,DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+HDF_SD_GETDATA, thisSdsID, lon
+
+; Close file.
+HDF_SD_END, newFileID
+
+; Convert the 3D data to 2D data at time=0.
+data2D=data[*,*,0]
+
+; Get max and min value of data.
+datamin=min(data2D)
+datamax=max(data2D)
+
+; Generate the plot.
+levels = 254
+DEVICE, DECOMPOSED=0
+LoadCT, 33, NCOLORS=levels, BOTTOM=1
+WINDOW, Title='FIELD:' + long_name + '       UNIT:'+units
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+  POSITION=[0.05, 0.05, 0.82, 0.82]
+
+; Don't use /CELL_FILL since lat is not monotonic.
+CONTOUR, data2D, lon, lat, /OVERPLOT, /CELL_FILL, C_Colors=Indgen(levels)+3, $
+         Background=1, NLEVELS=levels, Color=Black
+MAP_GRID, /LABEL
+MAP_CONTINENTS
+
+; Draw title and unit.
+XYOuts, 0.05, 0.86, /Normal, $
+        'FIELD:' + long_name + 'at time=0', $
+        Charsize=1.25, color=black, Alignment=0.0
+XYOuts, 0.95, 0.86, /Normal, 'UNIT:' + units, $ 
+  Charsize=1.25, Color=black, Alignment=1.0
+XYOuts, 0.5, 0.94, /Normal, FILE_NAME, $
+  Charsize=1.25, Color=black, Alignment=0.5
+
+;   The following code is prepared for colorbar. 
+;
+;   If you require colorbar in your plot, you could download 
+; "Dr. Fanning's Coyote Library" from [1]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' ahead of coding. 
+;
+;    Add the coyote directory you create on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; Let's assume that you've installed coyote library under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, Range=[datamin, datamax], Ncolors=levels, /Vertical, $ 
+  Position=[0.9,0.05,0.94,0.8]
+
+; Write JPEG image file.
+im = TVRD(TRUE=3)
+jpg = 'CERES_EBAF_TOA_Terra_Edition1A_200003-200510.nc_netclr_level0.idl.JPG' 
+WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; References
+;
+; [1] http://www.dfanning.com/documents/programs.html

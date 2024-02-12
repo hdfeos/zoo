@@ -1,0 +1,93 @@
+;
+;  This example code illustrates how to access and visualize ICESat-2
+; ATL11 L3B HDF5 file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Usage:
+;
+;  $idl ATL11_051911_0307_001_01.h5.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2020-12-08
+
+; Open file.
+file_name='ATL11_051911_0307_001_01.h5'
+file_id=H5F_OPEN(file_name)
+
+; Read latitude.
+latitude_name='/pt1/latitude'
+latitude_id=H5D_OPEN(file_id, latitude_name)
+lat=H5D_READ(latitude_id)
+
+; Close dataset.
+H5D_CLOSE, latitude_id
+
+; Read longitude.
+lon_name='/pt1/longitude'
+lon_id=H5D_OPEN(file_id, lon_name)
+lon=H5D_READ(lon_id)
+
+; Close dataset.
+H5D_CLOSE, lon_id
+
+
+; Read data.
+data_name='/pt1/h_corr'
+data_id=H5D_OPEN(file_id, data_name)
+data=H5D_READ(data_id)
+
+; Read unit attribute.
+units_id=H5A_OPEN_NAME(data_id, 'units')
+units=H5A_READ(units_id)
+H5A_CLOSE, units_id
+
+; Read long name attribute.
+ln_id=H5A_OPEN_NAME(data_id, 'long_name')
+long_name=H5A_READ(ln_id)
+H5A_CLOSE, ln_id
+
+; Get fill value.
+fillvalue_id=H5A_OPEN_NAME(data_id,'_FillValue')
+fillvalue=H5A_READ(fillvalue_id)
+H5A_CLOSE, fillvalue_id
+
+; Close dataset.
+H5D_CLOSE, data_id
+
+
+; Close file.
+H5F_CLOSE, file_id
+
+; Process fill value.
+idx=where(data eq fillvalue(0), cnt)
+if cnt gt 0 then data[idx] = !Values.F_NAN
+
+; Subset at Cycle 3.
+data = data[0,*]
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.35, 0.2, long_name+' at Cycle 3')
+datamin=MIN(data, /NAN)
+datamax=MAX(data, /NAN)
+c1 = SCATTERPLOT(lon, lat, OVERPLOT=m, $
+                 MAGNITUDE = data, $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+
+; We need custom colorbar because we use SCATTERPLOT().
+; We cannot use TARGET=c1.
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

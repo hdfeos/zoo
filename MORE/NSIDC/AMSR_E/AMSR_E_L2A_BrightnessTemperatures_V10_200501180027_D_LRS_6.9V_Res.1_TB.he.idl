@@ -1,0 +1,93 @@
+;This example code illustrates how to access and visualize NSIDC_AMSR Swath file in IDL. 
+;If you have any questions, suggestions, comments  on this example, please use the HDF-EOS Forum (http://hdfeos.org/forums). 
+;If you would like to see an  example of any other NASA HDF/HDF-EOS data product that is not listed in the HDF-EOS Comprehensive Examples page (http://hdfeos.org/zoo), 
+;feel free to contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Refer to: AMSR_E_L2A_BrightnessTemperatures_V10_200501180027_D.hdf
+; DataField name: 6.9V_Res.1_TB
+
+; IDL example for reading AMSR Swath file
+; Open file
+FILE_NAME='AMSR_E_L2A_BrightnessTemperatures_V10_200501180027_D.hdf'
+
+; Define swath name
+SWATH_NAME='Low_Res_Swath'
+file_id=EOS_SW_OPEN(FILE_NAME)
+swath_id=EOS_SW_ATTACH(file_id, SWATH_NAME)
+
+; Define datafield
+DATAFIELD_NAME='6.9V_Res.1_TB'
+status=EOS_SW_READFIELD(swath_id,DATAFIELD_NAME,data)
+
+; Retrieve lat/lon
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+
+; Close file
+status=EOS_SW_DETACH(swath_id)
+status=EOS_SW_CLOSE(file_id)
+
+;retrieve attributes
+FILE_NAME='AMSR_E_L2A_BrightnessTemperatures_V10_200501180027_D.hdf'
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+DATAFIELD_NAME='6.9V_Res.1_TB'
+index = HDF_SD_NAMETOINDEX(newFileID, DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'UNIT')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+scalefactor_index=HDF_SD_ATTRFIND(thisSdsID, 'SCALE FACTOR')
+HDF_SD_ATTRINFO, thisSdsID, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(thisSdsID, 'OFFSET')
+HDF_SD_ATTRINFO, thisSdsID, offset_index, DATA=offset
+
+HDF_SD_END, newFileID
+
+; Read fillvalue from data
+fillvalue=-32768.00
+
+;convert data type
+data=float(data)
+fillvalue=float(fillvalue)
+
+; Data transformation
+data=offset(0)+(scale_factor(0))*data
+fillvalue=offset(0)+(scale_factor(0))*fillvalue
+
+;get max and min value of data
+idx=where(data ne fillvalue(0), cnt)
+if cnt gt 0 then datamin=min(data[idx])
+if cnt gt 0 then datamax=max(data[idx])
+
+; Process fillvalue, convert data that are equal to fillvalue to NaN
+idx=where(data eq fillvalue, cnt)
+;if cnt gt 0 then data[idx] = !Values.F_NAN ; require float data
+
+;The following coding is prepared for colorbar. 
+;If you require colorbar in your plot, you could download Dr. Fanning's Coyote Library from (http://www.dfanning.com/documents/programs.html). 
+;Make a directory named coyote somewhere on your machine, and extract the Coyote files into it. 
+;If color bar is not not necessary for your plot, you can ignore this step and add comment character ';' ahead of coding. 
+;Add the coyote directory you create on your machine to your IDL path. !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+!PATH=Expand_Path('+/mnt/hdf/ziying-li/coyote/')+':'+!PATH
+
+; Start off generating the plot
+levels=30
+device,decomposed=0
+WINDOW, Title='Low Res Swath 6 9V Res 1 TB'+'  '+'units:'+units
+LoadCT,33, Ncolors=levels, Bottom=1
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, POSITION=[0.05, 0.05, 0.82, 0.95]
+CONTOUR, data, lon, lat, /OVERPLOT, /FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=30, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+;The following coding is to generate color bar if your already download and install Dr. Fanning's Coyote Library and add the coyote directory above. 
+;If you don't need color bar in your plot, you can ignore this step and add comment character ';' ahead of coding.
+COLORBAR, Range=[datamin,datamax], Ncolors=levels, /Vertical, Position=[0.9,0.1,0.94,0.9]
+
+
+
+
+

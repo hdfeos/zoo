@@ -1,0 +1,102 @@
+;
+;  This example code illustrates how to access and visualize LaRC ASDC MOPITT L2
+; HDF-EOS5 Swath file in IDL.
+;
+;  If you have any questions, suggestions, comments on this example, please 
+; use the HDF-EOS Forum (http://hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or 
+; post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Usage:
+;
+;  %idl MOP02N-20180311-L2V17.9.2.he5.idl
+;
+; Tested under: IDL 8.2.3
+; Last updated: 2018-09-12
+
+; Open file.
+file_name='MOP02N-20180311-L2V17.9.2.he5'
+file_id=H5F_OPEN(file_name)
+
+datafield_name='/HDFEOS/SWATHS/MOP02/Data Fields/RetrievedCOTotalColumn'
+data_id=H5D_OPEN(file_id,datafield_name)
+
+
+dataspace_id=H5D_GET_SPACE(data_id)
+dims=H5S_GET_SIMPLE_EXTENT_DIMS(dataspace_id)
+dims=float(dims)
+
+; Convert data type for division operator.
+lon_dims=dims(0)
+lat_dims=dims(1)
+
+
+data=H5D_READ(data_id)
+
+; Get units
+units_id=H5A_OPEN_NAME(data_id, 'units')
+units=H5A_READ(units_id)
+
+; Get fillvalue
+fillvalue_id=H5A_OPEN_NAME(data_id,'_FillValue')
+fillvalue=H5A_READ(fillvalue_id)
+
+H5A_Close, units_id
+H5A_Close, fillvalue_id
+H5D_Close, data_id
+
+; Read latitude.
+latitude_name='/HDFEOS/SWATHS/MOP02/Geolocation Fields/Latitude'
+latitude_id=H5D_OPEN(file_id, latitude_name)
+lat=H5D_READ(latitude_id)
+
+; Close dataset.
+H5D_CLOSE, latitude_id
+
+; Read longitude.
+lon_name='/HDFEOS/SWATHS/MOP02/Geolocation Fields/Longitude'
+lon_id=H5D_OPEN(file_id, lon_name)
+lon=H5D_READ(lon_id)
+
+; Close dataset.
+H5D_CLOSE, lon_id
+
+
+; Get max and min value of data.
+idx=where(data ne fillvalue(0), cnt)
+if cnt gt 0 then datamin=min(data[idx])
+if cnt gt 0 then datamax=max(data[idx])
+
+; Select data to plot.
+data=REFORM(data(0,*))
+
+; Process fill value, convert data that are equal to fillvalue to NaN
+idx=where(data eq fillvalue(0), cnt)
+if cnt gt 0 then data[idx] = !Values.F_NAN
+datamin=min(data)
+datamax=max(data)
+dim=size(data,/dim)
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.35, 0.01, 'RetrievedSurfaceTemperature')
+
+; We use SCATTERPLOT because data is 2-d lat/lon swath.
+; lon[*]/lat[*]/dataf[*] will make 1-d dataset.
+c1 = SCATTERPLOT(lon[*], lat[*], OVERPLOT=m, $
+                 MAGNITUDE = data[*], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+
+; We need custom colorbar because we use SCATTERPLOT().
+; We cannot use TARGET=c1.
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

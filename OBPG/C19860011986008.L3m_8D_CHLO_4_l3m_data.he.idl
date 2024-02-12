@@ -1,0 +1,150 @@
+; 
+;  This example code illustrates how to access and visualize OBPG CZCS
+; HDF4 file in IDL. 
+;
+;  If you have any questions, suggestions, comments on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums). 
+; 
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS
+; data product that is not listed in the HDF-EOS  Comprehensive  Examples 
+; page (http://hdfeos.org/zoo), feel free to contact us at 
+; eoshelp@hdfgroup.org or post it at the HDF-EOS Forum 
+; (http://hdfeos.org/forums).
+;
+; Tested under: IDL 8.0
+; Last updated: 2012-12-20
+
+
+; Open file.
+file_name='C19860011986008.L3m_8D_CHLO_4.hdf'
+newFileID=HDF_SD_START(file_name, /READ)
+
+; get vector point for lat and lon
+index=HDF_SD_ATTRFIND(newFileID, 'SW Point Latitude')
+HDF_SD_ATTRINFO, newFileID, index, NAME=n, TYPE=t, COUNT=c, DATA=veclat, HDF_TYPE=h
+
+index=HDF_SD_ATTRFIND(newFileID, 'SW Point Longitude')
+HDF_SD_ATTRINFO, newFileID, index, DATA=veclon
+
+units_index=HDF_SD_ATTRFIND(newFileID, 'Units')
+HDF_SD_ATTRINFO, newFileID, units_index, DATA=units
+
+long_name_index=HDF_SD_ATTRFIND(newFileID, 'Parameter')
+HDF_SD_ATTRINFO, newFileID, long_name_index, DATA=long_name
+
+; get vector point for Latitude Step and Longitude Step
+index=HDF_SD_ATTRFIND(newFileID, 'Latitude Step')
+HDF_SD_ATTRINFO, newFileID, index, DATA=latstep
+
+index=HDF_SD_ATTRFIND(newFileID, 'Longitude Step')
+HDF_SD_ATTRINFO, newFileID, index, DATA=lonstep
+
+; Retrieve data
+datafield_name="l3m_data"
+index=HDF_SD_NAMETOINDEX(newFileID,datafield_name)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+HDF_SD_GETDATA, thisSdsID, data
+
+; Read slope for data transformation.
+index=HDF_SD_ATTRFIND(thisSdsID, 'Slope')
+HDF_SD_ATTRINFO, thisSdsID, index, DATA=slope
+
+; Read intercept for data transformation.
+index=HDF_SD_ATTRFIND(thisSdsID, 'Intercept')
+HDF_SD_ATTRINFO, thisSdsID, index, DATA=intercept
+
+; Read base for data transformation.
+index=HDF_SD_ATTRFIND(thisSdsID, 'Base')
+HDF_SD_ATTRINFO, thisSdsID, index, DATA=base
+
+; Close file.
+HDF_SD_END, newFileID
+
+; Calculate the latitude and longitude range based on vector points 
+; and lat/lon step
+lat=FINDGEN(4320)*latstep(0)+veclat(0)
+lon=FINDGEN(8640)*lonstep(0)+veclon(0)
+
+; Reverse latitude.
+lat=REVERSE(lat)
+
+; Read fillvalue from data.
+fillvalue = 65535
+
+; Convert type from UINT16 to FLOAT.
+dataf=FLOAT(data) 
+
+; Process fill values, convert data that are equal to fillvalue to NaN
+idx=WHERE(data eq fillvalue, cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Apply the scale and offset based on the formula in the attribute.
+dataf=FLOAT(base(0))^((FLOAT(slope(0))*dataf)+FLOAT(intercept(0)))
+
+; Get max and min value of data for contour and color bar.
+datamin = MIN(dataf, /NAN)
+
+; We limit the maximum value to 1 to match the NASA chlorophyll image in [1].
+; Althogh the value ranges from 0.01 to 65 and most values are very small.
+datamax = 1.0
+
+; Generate the plot.
+levels=254
+DEVICE, DECOMPOSED=0
+LOADCT,33, NCOLOR=levels, BOTTOM=1
+WINDOW, TITLE='FIELD:' + long_name + '  ' + 'UNIT:' + units, XSIZE=800, YSIZE=500
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, POSITION=[0.05, 0.05, 0.81, 0.82], /NOERASE
+
+; It is important to set MIN_VALUE and MAX_VALUE since 
+; most data values are very tiny.
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_COLORS=Indgen(levels)+3, BACKGROUND=1, NLEVELS=levels, COLOR=Black, MIN_VALUE=datamin, MAX_VALUE=datamax
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+
+; Draw file name, field name, and unit.
+XYOUTS, 0.05, 0.87, /NORMAL, 'FIELD:' + long_name, $
+  CHARSIZE=1.25,  ALIGNMENT=0.0
+XYOUTS, 0.94, 0.87, /NORMAL, 'UNIT:' + units, $ 
+  CHARSIZE=1.25,  ALIGNMENT=1.0
+XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+  CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+; If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+; If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+; Add the coyote directory that you created on your machine to your IDL
+; path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+; If you don't need a color bar in your plot, you can ignore this step
+; by adding comment character ';' at the beginning of the code.
+COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+  Position=[0.94,0.05,0.98,0.82], FORMAT='(F5.2)'
+
+
+; Write JPEG image file.
+im = TVRD(TRUE=3)
+jpg = 'C19860011986008.L3m_8D_CHLO_4_l3m_data.idl.JPG'   
+WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; Reference
+;
+; [1] http://oceancolor.gsfc.nasa.gov/ANALYSIS/PROCTEST/cr01_sr051/deep_chlor_a_images.html
+; [2] http://www.dfanning.com/documents/programs.html
+

@@ -1,0 +1,87 @@
+;
+;  This example code illustrates how to access and visualize PO.DAAC
+;  QuikSCAT Grid file in IDL.
+;
+;  If you have any questions, suggestions, comments on this example, please 
+; use the HDF-EOS Forum (http://hdfeos.org/forums). 
+; 
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org 
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;                               
+; $idl QS_XWGRD3_2008001.20080021608.hdf.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2019-10-18
+
+; Open file.
+  file_name='QS_XWGRD3_2008001.20080021608.hdf'
+  newFileID=HDF_SD_START(file_name, /READ)
+
+; Define datafield.
+  datafield_name='des_avg_wind_speed'
+  index=HDF_SD_NAMETOINDEX(newFileID,datafield_name)
+
+; Read data.
+  thisSdsID=HDF_SD_SELECT(newFileID, index)
+  HDF_SD_GETDATA, thisSdsID, data
+
+
+; Read attributes.
+  long_name_index=HDF_SD_ATTRFIND(thisSdsID, 'long_name')
+  HDF_SD_ATTRINFO, thisSdsID, long_name_index, DATA=long_name
+
+  units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+  HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+  slope_index=HDF_SD_ATTRFIND(thisSdsID, 'scale_factor')
+  HDF_SD_ATTRINFO, thisSdsID, slope_index, data=slope
+
+  intercept_index=HDF_SD_ATTRFIND(thisSdsID, 'add_offset')
+  HDF_SD_ATTRINFO, thisSdsID, intercept_index, data=intercept
+
+  HDF_SD_END, newFileID
+
+; Read fillvalue from data.
+  fillvalue=0.00
+
+; Convert data type.
+  dataf=float(data)
+  fillvaluef=float(fillvalue)
+
+; Apply offset and scale_factor on data.
+  dataf=slope(0)*dataf+intercept(0)
+  fillvaluef=slope(0)*fillvaluef+intercept(0)
+
+; Process fill values, convert data that are equal to fillvalue to NaN.
+  idx=where(dataf eq fillvaluef(0), cnt)
+
+; Retrieve dimension sizes of data.
+  dimsize=size(dataf,/dim)
+  numlat=dimsize(1)
+  numlon=dimsize(0)
+
+; Calculate the latitude and longitude range based on lowright and upleft.
+  lat=FINDGEN(numlat)*0.25-89.875
+  lon=FINDGEN(numlon)*0.25
+  lon[WHERE(lon GT 180)] = lon[WHERE(lon GT 180)] - 360
+
+; SET_PLOT, 'Z'
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+
+t1 = TEXT(0.1, 0.1, long_name)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, $
+              POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+

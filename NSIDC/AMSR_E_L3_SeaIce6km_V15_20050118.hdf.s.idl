@@ -1,0 +1,146 @@
+;
+;  This example code illustrates how to access and visualize NSIDC AMSR-E
+; SeaIce 6km HDF-EOS2 Grid file in IDL.
+; This Grid file uses Polar Stereographic projection.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+; $idl AMSR_E_L3_SeaIce6km_V15_20050118.hdf.s.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2022-02-04
+
+FILE_NAME='AMSR_E_L3_SeaIce6km_V15_20050118.hdf'
+GRID_NAME='SpPolarGrid06km'
+DATAFIELD_NAME='SI_06km_SH_89V_DAY'
+
+; See the specification [1]. The file doesn't have unit attribute.
+UNIT = 'K'
+
+; Open file.
+file_id = EOS_GD_OPEN(FILE_NAME)
+
+; Attach grid.
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+
+; Retrieve grid info.
+status = EOS_GD_GRIDINFO(grid_id, xdimsize, ydimsize, upleft, lowrgt)
+; PRINT, upleft, lowrgt, xdimsize, ydimsize
+
+; Retrieve pojection info.
+status = EOS_GD_PROJINFO(grid_id, projcode, zonecode, spherecode, projparam)
+; PRINT, projcode, zonecode, spherecode, projparam
+
+
+; Retrieve data.
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, data)
+
+; Detach grid.
+status = EOS_GD_DETACH(grid_id)
+
+; Close file
+status = EOS_GD_CLOSE(file_id)
+
+; Read fill value from data and spec [1].
+fillvalue = 0
+
+; Convert data type
+dataf=float(data)
+
+; Process fill value.
+idx=where(data eq fillvalue, cnt)
+if cnt gt 0 then dataf[idx]=!Values.F_NAN
+
+; Multiply scale by 0.1 to get Kelvin according to [1].
+dataf = dataf * 0.1
+
+; Get max and min value of data.
+datamin = min(dataf, /NAN)
+datamax = max(dataf, /NAN)
+
+; The file contains Polar Stereographic projection. 
+; We need to use eosdump to generate 1D lat and lon.
+; For information on how to obtain the lat/lon data, check [2].
+
+; Retrieve dimension sizes of data
+dimsize=size(data,/dim)
+numlat=dimsize(0)
+numlon=dimsize(1)
+
+; In IDL, GCTP starts from 100 and EOS_GD_PROJINFO returns 6 for Polar
+; Stereo graphic projection. IDL's Polar Stereographic
+; projection code is 106. 
+projcode = 100+projcode
+
+clon = projparam[4]/1000000.0
+clat = projparam[5]/1000000.0
+
+; Please note that /GCTP must be specified. 
+mapStruct = MAP_PROJ_INIT(projcode, /GCTP, CENTER_LONGITUDE=clon, $
+                          CENTER_LATITUDE=clat)
+x0 = upleft(0)
+x1 = lowrgt(0)
+y0 = upleft(1)
+y1 = lowrgt(1)
+
+xinc = (x1 - x0 ) / xdimsize
+yinc = (y1 - y0 ) / ydimsize
+x = FINDGEN(xdimsize)*(xinc)  + x0
+y = FINDGEN(ydimsize)*(yinc)  + y0
+
+; Create mesh.
+xarr = x # Replicate(1, N_Elements(y))
+yarr = Replicate(1, N_Elements(x)) # y
+
+; See MAP_RPOJ_INVERSE IDL reference manual.
+; The function returns (2,n) array of lat/lon.
+result  = MAP_PROJ_INVERSE(xarr, yarr, MAP_STRUCTURE=mapStruct)
+lon = result[0,*]
+lat = result[1,*]
+
+; Get min/max values for lat and lon.
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+m = MAP('Polar Stereographic', $
+  LIMIT=[latmin, lonmin, latmax, lonmax], $
+  CENTER_LATITUDE=90.0, $
+  TITLE=file_name, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+
+; Do not use /FILL to handle fill values correctly on polar
+; stereographic projection.
+t1 = TEXT(0.35, 0.01, DATAFIELD_NAME)
+;c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+;             RGB_TABLE=ct, $
+;             GRID_UNITS='degrees')
+c1 = SCATTERPLOT(lon, lat, OVERPLOT=m, $
+                 MAGNITUDE = dataf[*], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+
+; See the specification [1]. The dataset doesn't have unit attribute.
+unit = 'K'
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=unit)
+png = file_name + '.s.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+
+
+; Reference
+;
+; [1] https://nsidc.org/data/AE_SI6
+
+

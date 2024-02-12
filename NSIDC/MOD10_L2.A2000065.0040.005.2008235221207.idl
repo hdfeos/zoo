@@ -1,0 +1,202 @@
+;  This example code illustrates how to access and visualize NSIDC MODIS
+; Swath file in IDL. This Grid file uses Sinusoidal projection.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Define file name, grid name, and data field.
+FILE_NAME='MOD10_L2.A2000065.0040.005.2008235221207.hdf'
+SWATH_NAME='MOD_Swath_Snow'
+DATAFIELD_NAME='Snow_Cover'
+
+; Open file.
+file_id = EOS_SW_OPEN(FILE_NAME)
+
+; Retrieve data.
+grid_id = EOS_SW_ATTACH(file_id, SWATH_NAME)
+status = EOS_SW_READFIELD(grid_id, DATAFIELD_NAME, data)
+
+; Close file.
+status = EOS_SW_DETACH(grid_id)
+status = EOS_SW_CLOSE(file_id)
+
+; Retrieve attributes using HDF_SD_...() routines because they are not
+; accessible through EOS_GD_...() APIs.
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+index=HDF_SD_NAMETOINDEX(newFileID,DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=unit
+
+Fillvalue_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, Fillvalue_index, data=fillvalue
+
+HDF_SD_END, newFileID
+
+; Convert data type.
+dataf=float(data)
+
+; Process fillvalue. fillvalue(0) is necessary since it is read from
+; attribute.
+; 
+; In this file, the data field has mostly two discrete values: ocean
+; and fill  value.  Therefore, we will not filter out fill values
+; for demonstration purporse. 
+idx=where(data eq fillvalue(0),cnt)
+if cnt gt 0 then dataf[idx]=!Values.F_NAN
+
+
+; If you want to apply fill value above, replace the below "data" with
+; "dataf" below and adjust the plot and color bar at the bottom of
+; this code.
+data_unique = data[UNIQ(data, SORT(data))]
+
+; Check what discrete "Key" values are used to determine color table
+; and discrete color bar.
+PRINT, data_unique
+dimsize_data_unique = size(data_unique,/dim)
+
+; The file contains SINUSOIDAL projection. We need to use eosdump to generate
+; 1D lat and lon. For information on how to obtain the lat/lon data,
+; check [1].
+
+; Retrieve dimension size of datadimsize=size(data,/dim) 
+dimsize=size(data,/dim)
+numlat=dimsize(0)
+numlon=dimsize(1)
+openr,1,'lat_MOD10_L2.A2000065.0040.005.2008235221207.output'
+size=numlat*numlon
+ValInlat=FltArr(size)
+READF,1,ValInlat
+lat=FINDGEN(numlat,numlon)
+lat=Reform(ValInlat,numlat,numlon)
+
+openr,2,'lon_MOD10_L2.A2000065.0040.005.2008235221207.output'
+ValInlon=FltArr(size)
+READF,2,ValInlon
+lon=FINDGEN(numlat,numlon)
+lon=Reform(ValInlon,numlat,numlon)
+
+; Set the limits for zoomed image.
+; Since it's polar view, lonmin and lonmax are meaningless.
+latmin=min(lat)
+latmax=max(lat)
+
+;   The following code is prepared for colorbar. 
+;
+;   If you require colorbar in your plot, you could download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' ahead of coding. 
+;
+;    Add the coyote directory you create on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; Let's assume that you've installed coyote library under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+;
+; Construct color table based on the following assignment:
+;
+; Key  R  G   B    Name
+; 0   255 255 255  white
+; 1   184 184 184
+; 11  225 225 150
+; 25  0   255 0
+; 37  35  35  117
+; 39  35  35  117
+; 50  100 200 255
+; 100 255 176 255
+; 153 0   0   0
+; 193 0   0   0
+; 200 255 0   0
+; 233 0   0   0
+; 254 0   0   0
+; 255 0   0   0  black
+;
+; The above assignment is close to "Image Gallery" of NSIDC [3].
+
+;
+; The first black (0,0,0) entry is for background(bg).
+; We'll use (127,127,127) for Key 0 since map line is white.
+;
+; The key values are obtained using the "PRINT, data_unique" statement
+; above.
+;
+;Key:    bg,   0,  39
+red =   [0, 127, 35]
+green = [0, 127, 35]
+blue =  [0, 127, 117]
+
+; Generate the plot
+levels = dimsize_data_unique(0)
+DEVICE, DECOMPOSED=0
+TVLCT, red, green, blue
+; LoadCT, 33, NCOLORS=levels, BOTTOM=1
+WINDOW, Title='FIELD:' + DATAFIELD_NAME + '       UNIT:'+unit
+; This LAMAZ projection data spans over -90 to 90 and -180 and 180.
+
+lonmin=-180
+lonmax=180
+
+; LAMBERT Azimuthal Projection with origin at the North pole (90 lat)
+; The /ISOTROPIC option makes the plot square.
+MAP_SET, /LAMBERT, 90, 0, 0, /ISOTROPIC, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+ POSITION=[0.05, 0.05, 0.82, 0.82], LIMIT=[latmin, lonmin, latmax, lonmax]
+; Generate the filled contour plot
+
+; Please note that we use LEVELS for discrete value plot.
+CONTOUR, data, lon, lat, /OVERPLOT, /CELL_FILL,$
+ C_Colors=Indgen(levels)+1, LEVELS=data_unique
+MAP_GRID, /LABEL
+MAP_CONTINENTS, COLOR=WHITE
+
+XYOuts, 0.05, 0.86, /Normal, DATAFIELD_NAME, $
+  Charsize=1.25, color=black, Alignment=0.0
+XYOuts, 0.82, 0.86, /Normal, 'UNIT:' + unit, $ 
+  Charsize=1.25, Color=black, Alignment=1.0
+XYOuts, 0.5, 0.92, /Normal, FILE_NAME, $
+  Charsize=1.75, Color=black, Alignment=0.5
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+;
+;   The key information in LABELS is obtained from the data field's
+;   "Key" attribute. You can check it using HDFView:
+;
+; 0=missing data, 1=no decision, 11=night, 25=no snow, 37=lake,
+; 39=ocean, 50=cloud, 100=lake ice, 200=snow, 254=detector saturated,
+; 255=fill
+;
+; We shortened 'missing data' to 'missing'.
+DCbar, NCOLORS=levels, BOTTOM=1,  /VERTICAL, Position=[0.86,0.1,0.88,0.8], $
+LABELS=['missing', 'ocean'] 
+
+; Write JPEG image file.
+im = TVRD(TRUE=3)
+jpg = FILE_NAME + '.idl.jpg' 
+WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+
+; Reference
+;
+; [1] http://hdfeos.org/zoo/note_non_geographic.php
+; [2] http://www.dfanning.com/documents/programs.html
+; [3] http://nsidc.org/data/modis/gallery/index.html
+

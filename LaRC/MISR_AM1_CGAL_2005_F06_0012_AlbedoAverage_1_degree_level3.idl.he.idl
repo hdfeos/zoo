@@ -1,0 +1,158 @@
+;  This example code illustrates how to access and visualize LaRC MISR
+;Grid file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Define file name, grid name, and data field
+FILE_NAME='MISR_AM1_CGAL_2005_F06_0012.hdf'
+GRID_NAME='AlbedoAverage_1_degree'
+DATAFIELD_NAME='Local albedo average - 1 deg'
+
+; Open file
+file_id = EOS_GD_OPEN(FILE_NAME)
+
+; Retrieve data
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, data)
+status = EOS_GD_GETFILLVALUE(grid_id, DATAFIELD_NAME, fill_value)
+status = EOS_GD_GRIDINFO(grid_id, xdimsize, ydimsize, upleft, lowright)
+status = EOS_GD_PIXREGINFO(grid_id, pixregcode)
+; Close file
+status = EOS_GD_DETACH(grid_id)
+status = EOS_GD_CLOSE(file_id)
+
+; There are two ways to compute lat, lon.
+; First, use the specification.
+; See the page p.264 of "MISR Data Products Specifications rev S" [1].
+; lat= FINDGEN(180)*(-1)+89.5
+; lon= FINDGEN(360)*1-179.5
+
+; However, the following will be more general approach.
+; We assume that HDFE_CENTER is 0 by default. See GDdefpixreg() in 
+; "HDF-EOS Library Users Guide for the ECS Project Volume 2: Function
+; Reference Guide".
+IF (pixregcode EQ 1) THEN PRINT, 'ERROR:Pixel is not centered.' 
+IF (pixregcode EQ 1) THEN EXIT
+
+; Pixel must be centered.
+offsetX = 0.5
+offsetY = 0.5
+
+; We need to readjust the limits of latitude and longitude. 
+; HDF-EOS is using DMS(DDDMMMSSS.SS) format to represent degrees.
+; So to calculate the lat and lon in degree, one needs to convert minutes and seconds into degrees. 
+
+; The following is the detailed description on how to calculate the
+; latitude  and longitude range based on lowright and upleft.
+; One should observe the fact that 1 minute is 60 seconds and 1 degree 
+; is 60 minutes. 
+
+; First calculate the difference of .SS between lowright and upleft.
+; Since the resulting number is very large, you need to specify /L64.
+lowright_ss= lowright*100-FLOOR(lowright, /L64)*100
+upleft_ss = upleft*100-FLOOR(upleft, /L64)*100;
+dss = lowright_ss - upleft_ss;
+
+; Then calculate the difference of SSS between lowright and upleft:
+lowright_s = floor(lowright) MOD 1000
+upleft_s = floor(upleft) MOD 1000
+
+ds = lowright_s - upleft_s +dss/100;
+
+; Then calculate the difference of MMM between lowright and upleft:
+lowright_m = floor(lowright/1000) MOD 1000
+upleft_m = floor(upleft/1000) MOD 1000
+
+dm = lowright_m-upleft_m +ds/60;
+
+; Then calculate the difference of DDD between lowright and upleft:
+lowright_d = floor(lowright/1000000)
+upleft_d = floor(upleft/1000000)
+dd = lowright_d-upleft_d+dm/60
+
+lat_limit = dd(1);
+lon_limit = dd(0);
+
+; We need to calculate the grid space interval between two adjacent points
+scaleX = lon_limit/xdimsize
+scaleY = lat_limit/ydimsize
+
+lon_value= FINDGEN(xdimsize)
+lat_value= FINDGEN(ydimsize)
+for i=0,xdimsize-1 do lon_value(i) = (i+offsetX)*(scaleX) + upleft_d(0);
+for j=0,ydimsize-1 do lat_value(j) = (j+offsetX)*(scaleY) + upleft_d(1);
+
+lon = float(lon_value)
+lat = float(lat_value)
+
+; Convert the M-D lat to 2D lat at Band=3
+data2D=data[3,*,*]
+data2D=reform(data2D)
+
+; Convert data type
+data2D=float(data2D)
+fill_value=float(fill_value)
+
+;get max and min value of data
+idx=where(data2D ne fill_value, cnt)
+if cnt gt 0 then datamin=min(data2D[idx])
+if cnt gt 0 then datamax=max(data2D[idx])
+
+; Process fillvalue, convert data that are equal to fillvalue to NaN
+idx=where(data2D eq fill_value, cnt)
+if cnt gt 0 then data2D[idx] = !Values.F_NAN
+
+;   The following code is prepared for colorbar. 
+;
+;   If you require colorbar in your plot, you could download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' ahead of coding. 
+;
+;    Add the coyote directory you create on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+;
+
+;  Let's assume that you've installed coyote library under the current working
+;  directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+; Generate the plot.
+levels=254
+device,decomposed=0
+LoadCT,33, Ncolors=levels, Bottom=1
+; Albedo doesn't have a unit according to the specification [1].
+WINDOW, Title='FIELD:'+DATAFIELD_NAME+' at Band=3'+'   '+'UNIT:No Unit', $
+ XSIZE=800
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, POSITION=[0.05, 0.05, 0.82, 0.80]
+CONTOUR, BYTSCL(data2D,/NAN), lon, lat, /OVERPLOT, /FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+XYOuts, 0.05, 0.87, /Normal, DATAFIELD_NAME+' at Band=3', Charsize=1.25, color=black, Alignment=0.0
+XYOuts, 0.82, 0.87, /Normal, 'UNIT:No Unit', Charsize=1.25, Color=black, Alignment=1.0
+XYOuts, 0.43, 0.92, /Normal, file_name, Charsize=1.75, Color=black, Alignment=0.5
+;  The following code assumes that you have already downloaded and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+;
+;  Since the value ranges 0.0 to 1.0, we need to specify FORMAT='(F10.1)'.
+COLORBAR, Range=[datamin,datamax], Ncolors=levels, /Vertical, Position=[0.9,0.05,0.94,0.8], FORMAT='(F10.1)'
+
+
+; References
+;
+; [1] https://asdc.larc.nasa.gov/documents/misr/DPS_v50_RevS.pdf
+; [2] http://www.dfanning.com/documents/programs.html

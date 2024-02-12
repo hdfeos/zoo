@@ -1,0 +1,124 @@
+;
+;  This example code illustrates how to access and visualize MEaSUREs 
+; GSSTF_NCEP HDF-EOS5 Grid file in IDL.
+;
+;  If you have any questions, suggestions, comments on this example, please 
+; use the HDF-EOS Forum (http://hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or 
+; post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Usage:
+;
+;  %idl GSSTF_NCEP.2c.2008.01.01.he5.idl
+;
+; Tested under: IDL 8.0
+; Last updated: 2013-1-18
+
+; Open file.
+  file_name='GSSTF_NCEP.2c.2008.01.01.he5'
+  file_id=H5F_OPEN(file_name)
+
+  datafield_name='/HDFEOS/GRIDS/NCEP/Data Fields/SST'
+  data_id=H5D_OPEN(file_id,datafield_name)
+
+
+  dataspace_id=H5D_GET_SPACE(data_id)
+  dims=H5S_GET_SIMPLE_EXTENT_DIMS(dataspace_id)
+  dims=float(dims)
+
+; Convert data type for division operator.
+  lon_dims=dims(0)
+  lat_dims=dims(1)
+
+
+  data=H5D_READ(data_id)
+
+; Get units
+  units_id=H5A_OPEN_NAME(data_id, 'Units')
+  units=H5A_READ(units_id)
+
+; Get fillvalue
+  fillvalue_id=H5A_OPEN_NAME(data_id,'_FillValue')
+  fillvalue=H5A_READ(fillvalue_id)
+
+
+; Get longname
+  longname_id=H5A_OPEN_NAME(data_id,'long_name')
+  longname=H5A_READ(longname_id)
+
+  H5A_Close, longname_id
+  H5A_Close, fillvalue_id
+  H5D_Close, data_id
+
+
+; Get max and min value of data.
+  idx=where(data ne fillvalue(0), cnt)
+  if cnt gt 0 then datamin=min(data[idx])
+  if cnt gt 0 then datamax=max(data[idx])
+
+; Process fill value, convert data that are equal to fillvalue to NaN
+  idx=where(data eq fillvalue(0), cnt)
+  if cnt gt 0 then data[idx] = !Values.F_NAN
+
+
+; Calculate the latitude and longitude range based on vector points
+; and lat/lon step
+  lat=FINDGEN(180)*(180.0/lat_dims)-90
+  lon=FINDGEN(360)*(360.0/lon_dims)-180
+
+; Generate a plot.
+levels = 254
+DEVICE, DECOMPOSED=0
+LOADCT, 33, NCOLORS=levels, BOTTOM=1
+WINDOW, TITLE = 'FIELD:' + longname+'   '+'UNIT:'+units
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+ POSITION=[0.05, 0.05, 0.82, 0.82]
+CONTOUR, data, lon, lat, /OVERPLOT, /CELL_FILL, C_COLORS=Indgen(levels)+3, $
+  NLEVELS=levels
+MAP_GRID, /BOX_AXES
+MAP_CONTINENTS
+
+; Draw file name, field name, and unit.
+XYOUTS, 0.05, 0.86, /NORMAL, 'FIELD:' + longname, $ 
+  CHARSIZE=1.25,  ALIGNMENT=0.0
+XYOUTS, 0.94, 0.86, /Normal, 'UNIT:' + units, $ 
+  CHARSIZE=1.25,  ALIGNMENT=1.0
+XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+  CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+;   If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [1]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+;   Add the coyote directory that you created on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+  !PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need a color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+ POSITION=[0.9,0.05,0.94,0.8]
+
+
+; Write JPEG image file.
+im = TVRD(TRUE=3)
+jpg = file_name + '.idl.jpg'   
+WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+EXIT
+; Reference
+;
+; [1] http://www.dfanning.com/documents/programs.html

@@ -1,0 +1,74 @@
+;
+;  This example code illustrates how to access and visualize 
+;  a PO.DACC ECCO L4 netCDF-4/HDF5 Grid file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl ATM_SURFACE_TEMP_HUM_WIND_PRES_day_mean_2017-12-31_ECCO_V4r4_latlon_0p50deg.nc.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2021-08-05
+
+; Open file. 
+file_name='ATM_SURFACE_TEMP_HUM_WIND_PRES_day_mean_2017-12-31_ECCO_V4r4_latlon_0p50deg.nc'
+file_id=NCDF_OPEN(file_name)
+
+; Read data.
+datafield_name='EXFatemp'
+data_id=NCDF_VARID(file_id, datafield_name)
+
+; Retrieve data.
+NCDF_VARGET, file_id, data_id, data
+
+; Get long_name.
+NCDF_ATTGET, file_id, data_id, 'long_name', long_name
+
+; Get units.
+NCDF_ATTGET, file_id, data_id, 'units', units
+
+; Get _FillValue.
+NCDF_ATTGET, file_id, data_id, '_FillValue', fillvalue
+
+
+; Read latitude.
+latitude_name='latitude'
+latitude_id=NCDF_VARID(file_id, latitude_name)
+NCDF_VARGET, file_id, latitude_id, lat
+
+; Read longitude.
+lon_name='longitude'
+longitude_id=NCDF_VARID(file_id, lon_name)
+NCDF_VARGET, file_id, longitude_id, lon
+
+; Close file.
+NCDF_CLOSE, file_id
+
+; Convert type to double.
+dataf = float(data[*,*,0])
+
+; Process fill value.
+idx=where(data eq fillvalue(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=7, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.35, 0.1, STRING(long_name))
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1,  $
+              Position=[0.85,0.2,0.87,0.8], TITLE=STRING(units))
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

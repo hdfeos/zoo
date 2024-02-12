@@ -1,0 +1,173 @@
+;
+;  This example code illustrates how to access and visualize LaRC CALIPSO Lidar
+; Level 2 Vertical Feature Mask Version 3.02 HDF4 file in IDL. 
+;
+;  If you have any questions, suggestions, comments on this example, please use
+; the HDF-EOS Forum (http://hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or 
+; post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl CAL_LID_L2_VFM-ValStage1-V3-41.2021-11-29T23-32-39ZD.hdf.v.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2021-12-06
+
+
+; Open file.
+file_name='CAL_LID_L2_VFM-ValStage1-V3-41.2021-11-29T23-32-39ZD.hdf'
+
+fid = HDF_SD_START(file_name, /READ)
+
+; Define data name. Use "HDFView" or "hdp" tool to check datasets
+; available inside the file.
+data_name="Feature_Classification_Flags"
+index=HDF_SD_NAMETOINDEX(fid, data_name)
+
+; Retrieve FCF data.
+sds_id=HDF_SD_SELECT(fid, index)
+HDF_SD_GETDATA, sds_id, fcf
+
+; Retrieve lat data.
+data_name="Latitude"
+index=HDF_SD_NAMETOINDEX(fid, data_name)
+sds_id=HDF_SD_SELECT(fid, index)
+HDF_SD_GETDATA, sds_id, lat
+
+; Retrieve lon data.
+data_name="Longitude"
+index=HDF_SD_NAMETOINDEX(fid, data_name)
+sds_id=HDF_SD_SELECT(fid, index)
+HDF_SD_GETDATA, sds_id, lon
+
+; End access to SDS.
+HDF_SD_ENDACCESS, sds_id
+
+; Close file.
+HDF_SD_END, fid
+
+; Users need to understand the layout of the Feature_Classification_Flag 
+; dataset.
+;
+; The Feature_Classification_Flag values are stored as a sequence of 5515
+;  element arrays (i.e., as an N x 5515 matrix, where N is the number of 
+; separate records in the file). In this file, N is 4224.
+;
+;  Each array represents a 5 km "chunk" of data, 
+; and each array element contains the feature classification information for a
+;  single range resolution element in the Level 0 lidar data downlinked from 
+; the satellite. As shown in the summary below, the vertical and horizontal 
+; resolution of the CALIPSO data varies as a function of altitude above mean 
+; sea level (see Hunt et al., 2009). 
+
+; Here's the summary of number of prfoiles per 5 km.
+; 
+; 3 profiles for 20.2km (base) to 30.1km (top) @ 180m
+; (index 1-165 / 55 samples per profile)
+; 5 profiles for 8.2km (base) to 20.2km (top) @ 60m
+; (index 166 - 1165 / 200 samples per profile)
+; 15 profiles for -0.5km (base) to 8.2km (top) @ 30m 
+; (index 1166 - 5515 / 290 samples per profile)
+;
+; 3 profiles mean horizontal resolution is 1667m because 3 * 1667m = 5km.
+; 55 samples mean vertical resolution is 180m because 55 * 180m = 9.9km  = 
+; 30.1km - 20.2km.
+;
+; In summary, profile size determines horizontal resolution and sample size
+; determines the vertical resolution.
+;
+; Each vertical feature mask record is a 16 bit integer.  See [1] for
+; details.
+; -----------------------------
+; Bits  | Description
+; -----------------------------
+; 1-3   | Feature Type
+; 4-5   | Feature Type QA
+; ...   |...
+; 14-16 | Horizontal averaging
+;
+;
+; In this example, we'll focus only on "Cloud" from "Featrue type."
+;
+; There are many possibilites to plot this data.
+;
+; Here, we'll subset -05km to 8.2km (e.g., 1165:5514) 
+; over latitude approx. 40N to 62N (e.g., 3500:3999)
+; and plot altitude vs. latitude.
+;
+; Subset latitude value that increases monotonically.
+lat = REFORM(lat(0, 3500:3999))
+dim = size(lat, /dim)
+
+; You can visualize other blocks by changing subset parameters.
+;  data = fcf(0:164, 3500:3999) ; 20.2km to 30.1km
+;  data = fcf(165:1164, 3500:3999) ; 8.2km to 20.2km
+data2d = REFORM(fcf(1165:5514, 3500:3999)) ; -0.5km to 8.2km
+
+; Select the first 3 bit for the feature type.
+data2d = data2d AND '0007'X
+
+; Reshape 2-D data to 3-D for n profiles * y samples. 
+; You can visualize other blocks by changing subset parameters.
+;  data3d = REFORM(data2d, [55, 3, dim])
+;  data3d = REFORM(data2d, [200, 5, dim])
+data3d = REFORM(data2d, [290, 15, dim])
+
+; Subset horizontally. Variation along longitude (i.e., profile) is very 
+; small. We'll just pick the first location from each profile.
+data = REFORM(data3d(*,0,*))
+
+; Visualize only Cloud flag.
+data[WHERE(data GT 2)] = 1
+data[WHERE(data LT 2)] = 1
+
+; Create altitude dataset manually.
+; You can visualize other blocks by changing subset parameters.
+; hgt = 20.2 + FINDGEN(55) * 0.18
+; hgt = 8.2 + FINDGEN(200) * 0.06
+hgt = -0.5 + FINDGEN(290) * 0.03
+
+; Generate the plot.
+levels = 2
+
+; Construct color table based on the following assignment:
+;
+; Key R   G   B     Name
+; 0   0   0   255  Others (not 2)
+; 1   225 225 255  cloud (2)
+ct = COLORTABLE([[0,   255], $
+                 [0,   255], $
+                 [255, 255]], $
+                NCOLORS = levels, /TRANSPOSE)
+c1 = CONTOUR(ROTATE(data,3), lat, hgt, $
+             /FILL, $
+             /BUFFER, $
+             BACKGROUND_COLOR=[0,0,255], $
+             RGB_TABLE=ct, $
+             TITLE=file_name, $
+             XTITLE='Latitude (degrees_north)', $
+             YTITLE='Altitude (km)', $             
+             POSITION=[0.1, 0.1, 0.82, 0.8])
+
+longname = 'Feature Type (Bits 1-3) in Feature Classification Flag'
+t1 = TEXT(0.25, 0.805, longname)
+
+; We need a custom discrete colorbar.
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[0,2], ORIENTATION=1, BORDER=1,$
+              TICKVALUES=[0.5,1.5], $
+              TICKNAME=['Others', 'Cloud'], $
+              TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8])
+
+; Write PNG image file.
+png = file_name+'.v.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+
+; References
+;
+; [1] http://www-calipso.larc.nasa.gov/resources/calipso_users_guide/data_summaries/vfm/index.php
+

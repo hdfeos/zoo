@@ -1,0 +1,130 @@
+;
+;  This example code illustrates how to access and visualize NSIDC
+; AMSR_E v15 Sea Ice 12km HDF-EOS2 Grid file in IDL. This Grid file
+; uses Polar Stereographic projection.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Usage:
+;                               
+; $idl AMSR_E_L3_SeaIce25km_V15_20050118.hdf.idl
+;
+; Tested under: IDL 8.2.3
+; Last updated: 2018-12-14
+
+; Define file name, grid name, and data field.
+file_name='AMSR_E_L3_SeaIce25km_V15_20050118.hdf'
+grid_name='NpPolarGrid25km'
+datafield_name='SI_25km_NH_06V_ASC'
+
+; Open file.
+file_id = EOS_GD_OPEN(file_name)
+
+; Attach grid.
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+
+; Retrieve grid info.
+status = EOS_GD_GRIDINFO(grid_id, xdimsize, ydimsize, upleft, lowrgt)
+; PRINT, upleft, lowrgt, xdimsize, ydimsize
+
+; Retrieve pojection info.
+status = EOS_GD_PROJINFO(grid_id, projcode, zonecode, spherecode, projparam)
+; PRINT, projcode, zonecode, spherecode, projparam
+
+; Retrieve data.
+status = EOS_GD_READFIELD(grid_id, datafield_name, data)
+
+; Detach grid.
+status = EOS_GD_DETACH(grid_id)
+
+; Close file.
+status = EOS_GD_CLOSE(file_id)
+
+; In IDL, GCTP starts from 100 and EOS_GD_PROJINFO returns 6 for Polar
+; Stereo graphic projection. IDL's Polar Stereographic
+; projection code is 106. 
+projcode = 100+projcode
+
+clon = projparam[4]/1000000.0
+clat = projparam[5]/1000000.0
+
+; Please note that /GCTP must be specified. 
+mapStruct = MAP_PROJ_INIT(projcode, /GCTP, CENTER_LONGITUDE=clon, $
+                          CENTER_LATITUDE=clat)
+x0 = upleft(0)
+x1 = lowrgt(0)
+y0 = upleft(1)
+y1 = lowrgt(1)
+
+xinc = (x1 - x0 ) / xdimsize
+yinc = (y1 - y0 ) / ydimsize
+x = FINDGEN(xdimsize)*(xinc)  + x0
+y = FINDGEN(ydimsize)*(yinc)  + y0
+
+; Create mesh.
+xarr = x # Replicate(1, N_Elements(y))
+yarr = Replicate(1, N_Elements(x)) # y
+
+; See MAP_RPOJ_INVERSE IDL reference manual.
+; The function returns (2,n) array of lat/lon.
+result  = MAP_PROJ_INVERSE(xarr, yarr, MAP_STRUCTURE=mapStruct)
+lon1d = result[0,*]
+lat1d = result[1,*]
+
+; Convert data type for fill value handling.
+dataf = float(data)
+
+
+; Process fill value.
+idx=WHERE(dataf LE 0, cnt)
+IF cnt GT 0 THEN dataf[idx]=!Values.F_NAN
+
+; Multiply by 0.1 to get Kelvin
+; https://nsidc.org/data/amsre/ae_si25_25km_seaice
+dataf = dataf * 0.1
+
+; Get max and min value of data.
+datamin = min(dataf, /NAN)
+datamax = max(dataf, /NAN)
+
+; Re-match the dataset dimension.
+lat=Reform(lat1d,xdimsize,ydimsize)
+lon=Reform(lon1d,xdimsize,ydimsize)
+
+; Get min/max values for lat and lon.
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+m = MAP('Polar Stereographic', $
+  LIMIT=[latmin, lonmin, latmax, lonmax], $
+  CENTER_LATITUDE=90.0, $
+  TITLE=file_name, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+
+; Do not use /FILL to handle fill values correctly on polar
+; stereographic projection.
+t1 = TEXT(0.35, 0.01, datafield_name)
+c1 = CONTOUR(dataf, lon, lat, OVERPLOT=m, $
+             /FILL, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees')
+mc = MAPCONTINENTS()
+
+unit = 'K'
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1,  Position=[0.9,0.1,0.94,0.8], TITLE=unit)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600
+EXIT
+
+; Reference
+;
+; [1] http://nsidc.org/data/docs/daac/ae_si12_12km_seaice/data.html
+

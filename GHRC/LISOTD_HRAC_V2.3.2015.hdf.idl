@@ -1,0 +1,82 @@
+;
+;  This example code illustrates how to access and visualize 
+;  GHRC Grid HDF4 file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl LISOTD_HRAC_V2.3.2015.hdf.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2020-01-08
+
+; Open file.
+  file_name='LISOTD_HRAC_V2.3.2015.hdf'
+  newFileID=HDF_SD_START(file_name, /READ)
+
+; Read data.
+  datafield_name='HRAC_COM_FR'
+  index=HDF_SD_NAMETOINDEX(newFileID,datafield_name)
+
+  thisSdsID=HDF_SD_SELECT(newFileID, index)
+  HDF_SD_GETDATA, thisSdsID, data
+
+; Convert the 3-D data to 2D data at Day of year=0.
+  data2D=data[0,*,*]
+  data2D=reform(data2D)
+
+; retrieve fillvalue, long_name and units
+  fillvalue_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+  HDF_SD_ATTRINFO, thisSdsID, fillvalue_index, DATA=fillvalue
+
+  long_name_index=HDF_SD_ATTRFIND(thisSdsID, 'long_name')
+  HDF_SD_ATTRINFO, thisSdsID, long_name_index, DATA=long_name
+
+  units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+  HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+; Retrieve lat/lon
+  lat_name='Latitude'
+  index=HDF_SD_NAMETOINDEX(newFileID,lat_name)
+
+  thisSdsID=HDF_SD_SELECT(newFileID, index)
+  HDF_SD_GETDATA, thisSdsID, lat
+
+  lon_name='Longitude'
+  index=HDF_SD_NAMETOINDEX(newFileID,lon_name)
+
+  thisSdsID=HDF_SD_SELECT(newFileID, index)
+  HDF_SD_GETDATA, thisSdsID, lon
+
+; Close file.
+  HDF_SD_END, newFileID
+
+; Convert data type.
+  dataf=float(data2D)
+  fillvaluef=float(fillvalue)
+
+; Process fill values, convert data that are equal to fillvalue to NaN
+  idx=where(dataf eq fillvaluef(0), cnt)
+
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.35, 0.1, long_name)
+c1 = CONTOUR(dataf, lon, lat, OVERPLOT=m, $
+             /FILL, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1,  $
+              Position=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

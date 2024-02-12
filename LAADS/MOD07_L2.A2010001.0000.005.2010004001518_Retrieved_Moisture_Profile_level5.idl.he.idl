@@ -1,0 +1,145 @@
+;  This example code illustrates how to access and visualize LAADS MOD07
+; Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Define file name, swath name, and data field.
+file_name='MOD07_L2.A2010001.0000.005.2010004001518.hdf'
+swath_name='mod07'
+datafield_name='Retrieved_Moisture_Profile'
+
+; Open file.
+file_id=EOS_SW_OPEN(file_name)
+
+; Attach Swath.
+swath_id=EOS_SW_ATTACH(file_id, swath_name)
+
+; Retrieve lat, lon, and data.
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,datafield_name,data)
+
+; Retrieve dimension info for title of the plot.
+status=EOS_SW_FIELDINFO(swath_id,datafield_name,rank,dims,numbertype,dimlist)
+
+; Detach Swath.
+status=EOS_SW_DETACH(swath_id)
+
+; Close file.
+status=EOS_SW_CLOSE(file_id)
+
+
+
+; Retrieve long_name, _FillValue, units, scale_factor, and add_offset 
+; attributes.
+file_id_hdf=HDF_SD_START(file_name, /READ)
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+valid_range_index=HDF_SD_ATTRFIND(sds_id, 'valid_range')
+HDF_SD_ATTRINFO, sds_id, valid_range_index, data=valid_range
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+scalefactor_index=HDF_SD_ATTRFIND(sds_id, 'scale_factor')
+HDF_SD_ATTRINFO, sds_id, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(sds_id, 'add_offset')
+HDF_SD_ATTRINFO, sds_id, offset_index, DATA=offset
+
+HDF_SD_ENDACCESS, sds_id
+HDF_SD_END, file_id_hdf
+
+; Convert the 3D data to 2D data by subsetting at Pressure Level=5.
+lev = 5
+data2D=data[*,*,lev]
+
+; Convert data type.
+dataf=float(data2D)
+
+; Process fillvalue.
+idx=WHERE(data2D EQ fillvalue(0), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Process valid_range.
+idx=WHERE(data2D LT valid_range(0) OR data2D GT valid_range(1), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Apply scale factor and offset according to the "MODIS ATMOSPHERIC
+; PROFILE RETRIEVALLGORITHM THEORETICAL BASIS DOCUMENT" [1].
+dataf = scale_factor(0) * (dataf - offset(0)) 
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; Prepare field name title using long name attribute and dimension name.
+dimlist = STRSPLIT(dimlist, ',', /EXTRACT)
+field = long_name(0) + ' at ' + dimlist(rank-1) + '=' + $
+  STRING(lev, FORMAT='(I1)')
+
+; Generate a plot.
+levels = 254
+DEVICE, DECOMPOSED=0
+LOADCT, 33, NCOLORS=levels, BOTTOM=1
+WINDOW, TITLE = 'FIELD:' + field + '  '+'UNIT:'+units
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+  POSITION=[0.05, 0.05, 0.82, 0.82]
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_COLORS=INDGEN(levels)+3, $
+  NLEVELS=levels
+MAP_GRID, /BOX_AXES
+MAP_CONTINENTS
+
+; Draw file name, field name, and unit.
+XYOUTS, 0.05, 0.86, /NORMAL, 'FIELD:' + field, $
+  CHARSIZE=1.25,  ALIGNMENT=0.0
+XYOUTS, 0.82, 0.86, /NORMAL, 'UNIT:' + units, $ 
+  CHARSIZE=1.25,  ALIGNMENT=1.0
+XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+  CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+;   If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+;   Add the coyote directory that you created on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+;   We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need a color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+ POSITION=[0.9,0.05,0.94,0.8], FORMAT='(F6.2)'
+
+; Reference
+;
+; [1] http://modis-atmos.gsfc.nasa.gov/_docs/MOD07MYD07ATBDC005.pdf
+; [2] http://www.dfanning.com/documents/programs.html
+

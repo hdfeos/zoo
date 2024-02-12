@@ -1,0 +1,171 @@
+;  This example code illustrates how to access and visualize LP DAAC MOD17A2
+; grid file in IDL. This file uses SINUSOIDAL projection.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Define file name, grid name, and data field.
+file_name='MOD17A2.A2007113.h11v09.005.2007136163924.hdf'
+grid_name='MOD_Grid_MOD17A2'
+datafield_name='PsnNet_1km'
+
+; Open file.
+file_id = EOS_GD_OPEN(file_name)
+
+; Attach Grid.
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+
+; Retrieve data.
+status = EOS_GD_READFIELD(grid_id, datafield_name, data)
+
+; Detach Grid.
+status = EOS_GD_DETACH(grid_id)
+
+; Close file.
+status = EOS_GD_CLOSE(file_id)
+
+; Retrieve long_name, units, valid_range, _FillValue, scale_factor,
+; and add_offset attributes.
+file_id_hdf=HDF_SD_START(file_name, /READ)
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+valid_range_index=HDF_SD_ATTRFIND(sds_id, 'valid_range')
+HDF_SD_ATTRINFO, sds_id, valid_range_index, data=valid_range
+
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+scalefactor_index=HDF_SD_ATTRFIND(sds_id, 'scale_factor')
+HDF_SD_ATTRINFO, sds_id, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(sds_id, 'add_offset')
+HDF_SD_ATTRINFO, sds_id, offset_index, data=offset
+
+HDF_SD_ENDACCESS, sds_id
+HDF_SD_END, file_id_hdf
+
+; The file contains SINUSOIDAL projection. We need to use eosdump to
+; generate 1D lat and lon. For information on how to obtain the
+; lat/lon data, please check [1].
+
+
+; Retrieve dimension size of data
+dimsize=SIZE(data,/dim)
+numlat=dimsize(0)
+numlon=dimsize(1)
+size=numlat*numlon
+
+; Read eosdump output file for latitude.
+OPENR, 1, $
+  'lat_MOD17A2.A2007113.h11v09.005.2007136163924.output'
+lat_input=FLTARR(size)
+READF, 1, lat_input
+
+lat=FINDGEN(numlat,numlon)
+lat=REFORM(lat_input,numlat,numlon)
+
+; Read eosdump output file for longitude.
+OPENR, 2, $
+  'lon_MOD17A2.A2007113.h11v09.005.2007136163924.output'
+lon_input=FLTARR(size)
+READF, 2, lon_input
+lon=FINDGEN(numlat,numlon)
+lon=REFORM(lon_input,numlat,numlon)
+
+; Get min/max value of lat and lon for zoomed image.
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+; Convert data type.
+dataf=float(data)
+
+; Process fill value.
+; Count fill values in the data set first because IDL will throw
+; warning on the "dataf[idx] = !Values.F_NAN" statement if there is no
+; fill value.
+idx = WHERE(data EQ fillvalue(0), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Process valid range.
+idx = WHERE(data LT valid_range(0) OR data GT valid_range(1), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Apply scale factor and offset according to the
+; "MODIS MYD17 L4 Tile 1-KM Gridded PRODUCT Specification" [2].
+dataf = (dataf - offset(0)) * scale_factor(0)
+
+; Get max and min value of data for color bar.
+datamin = min(dataf, /NAN)
+datamax = max(dataf, /NAN)
+
+; Generate a plot.
+levels = 254
+DEVICE, DECOMPOSED=0
+LOADCT, 33, NCOLORS=levels, BOTTOM=1
+WINDOW, TITLE = 'FIELD:' + long_name(0)+'   '+'UNIT:'+units
+MAP_SET, /SINUSOIDAL, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+  LIMIT=[latmin, lonmin, latmax, lonmax], POSITION=[0.05, 0.05, 0.82, 0.82]
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_COLORS=Indgen(levels)+3, $
+  NLEVELS=levels
+MAP_GRID, /BOX_AXES
+MAP_CONTINENTS
+
+; Draw file name, field name, and unit.
+XYOUTS, 0.05, 0.86, /NORMAL, 'FIELD:' + long_name(0), $ 
+  CHARSIZE=1.25,  ALIGNMENT=0.0
+XYOUTS, 0.94, 0.86, /Normal, 'UNIT:' + units, $ 
+  CHARSIZE=1.25,  ALIGNMENT=1.0
+XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+  CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+;   If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [3]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+;   Add the coyote directory that you created on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+;   We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need a color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+ POSITION=[0.9,0.05,0.94,0.8], FORMAT='(F5.2)'
+
+; Reference
+;
+; [1] http://hdfeos.org/zoo/note_non_geographic.php
+; [2] ftp://modular.nascom.nasa.gov/pub/LatestFilespecs/collection5/MOD17A2.fs
+; [3] http://www.dfanning.com/documents/programs.html
+
+
+
+
+

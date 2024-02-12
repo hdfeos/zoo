@@ -1,0 +1,120 @@
+;
+; This example code illustrates how to access and visualize GES DISC
+; MLS v4 Swath HDF-EOS5 file [1] in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Usage:
+;
+;  $idl MLS-Aura_L2GP-BrO_v04-23-c03_2016d302.he5.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2019-11-05
+
+
+; Open file.
+file_name='MLS-Aura_L2GP-BrO_v04-23-c03_2016d302.he5'
+file_id=H5F_OPEN(file_name)
+
+; Open datasets.  
+datafield_name='/HDFEOS/SWATHS/BrO/Data Fields/L2gpValue'
+data_id=H5D_OPEN(file_id,datafield_name)
+data=H5D_READ(data_id)
+
+pressure_name='/HDFEOS/SWATHS/BrO/Geolocation Fields/Pressure'
+pressure_id=H5D_OPEN(file_id, pressure_name)
+pressure=H5D_READ(pressure_id)
+
+; Get units
+units_id=H5A_OPEN_NAME(pressure_id, 'Units')
+units_p=H5A_READ(units_id)
+
+Time_name='/HDFEOS/SWATHS/BrO/Geolocation Fields/Time'
+time_id=H5D_OPEN(file_id,Time_name)
+time=H5D_READ(time_id)  
+
+; Convert 2D data to 1D.
+data=data(*,399)
+
+; Create an "elapsed time" variable (International Atomic Time)
+telapse=(time-time(0))/60
+
+; Get Title.
+attr_id=H5A_OPEN_NAME(data_id, 'Title')
+long_name=H5A_READ(attr_id)
+
+
+; Get units.
+units_id=H5A_OPEN_NAME(data_id, 'Units')
+units=H5A_READ(units_id)
+
+; Get missing value
+missingvalue_id=H5A_OPEN_NAME(data_id,'MissingValue')
+missingvalue=H5A_READ(missingvalue_id)
+
+; Convert data type
+dataf = float(data)
+missingvaluef = float(missingvalue(0))
+
+H5A_Close, missingvalue_id
+H5D_Close, data_id
+
+; Process missing value, convert dataf that are equal to missingvaluef to NaN
+idx = where(dataf eq missingvaluef(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+
+; Time's unit is TAI-93.
+; Compute the real time.
+; We don't count in leap second [2] which will give about 7 seconds ahead
+; of the real measurement time.
+time_at = time(399)
+start_time = JULDAY(1,1,1993, 0, 0, 0)
+sec = time_at / 86400
+t = start_time + sec
+CALDAT, t, Mo, D, Y, H, Mi, S
+tstring = STRING(Y, FORMAT='(I4)') + '-' + STRING(Mo, FORMAT='(I2.2)') + $
+          '-' + STRING(D, FORMAT='(I2.2)') + ' ' + STRING(H, FORMAT='(I2.2)') $ 
+          + ':' + STRING(Mi, FORMAT='(I2.2)') + ':' + STRING(S, FORMAT='(I2.2)')
+
+
+;  Read MLS Data Quality Document [3] for useful range in BrO data,
+;  which is 3.2hPa - 10hPa.
+
+; Create X axis label.
+x_label = long_name + ' ('+ units + ')'
+
+; Create Y axis label.
+y_label = 'Pressure ('+ units_p + ')'
+
+; Create title label.
+t_label = file_name + '!C!C' + long_name + ' at Time=' + tstring
+
+; Reverse Y-axis for pressure using YRANGE.
+d_max=MAX(pressure[12:16])
+d_min=MIN(pressure[12:16])
+
+; Draw a line plot.
+p = PLOT(data[12:16], pressure[12:16], $
+         YTITLE=y_label, XTITLE=x_label, TITLE=t_label, $
+         XTICKFONT_SIZE=8, YTICKFONT_SIZE=8, YRANGE=[d_max, d_min], $
+         /YLOG, YMAJOR=5, /BUFFER)
+png = file_name + '.idl.png'
+p.save, png, HEIGHT=600, WIDTH=800
+EXIT
+; References
+;
+; [1] https://cmr.earthdata.nasa.gov/search/concepts/C1251101115-GES_DISC/3
+; [2] http://maia.usno.navy.mil/ser7/tai-utc.dat
+; [3] http://mls.jpl.nasa.gov/data/v4-2_data_quality_document.pdf

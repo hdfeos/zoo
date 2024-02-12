@@ -1,0 +1,126 @@
+;
+;  This example code illustrates how to access and visualize GPM L1B file
+; in IDL. 
+;
+;  If you have any questions, suggestions, comments on this example, please 
+; use the HDF-EOS Forum (http://hdfeos.org/forums). 
+; 
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org 
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;                               
+; %idl 1B.GPM.GMI.TB2014.20160105-S230545-E003816.010538.V03C.HDF5.idl
+;
+; Tested under: IDL 8.2.3
+; Last updated: 2016-01-13
+
+; Open file.
+file_name='1B.GPM.GMI.TB2014.20160105-S230545-E003816.010538.V03C.HDF5'
+file_id=H5F_OPEN(file_name)
+
+
+; Retrieve data.
+datafield_name='/S1/Tb'
+data_id=H5D_OPEN(file_id, datafield_name)
+dataf=H5D_READ(data_id)
+
+; The attribute says fill value is -9999.900391 but data uses -9999.9.
+fv = -9999.9
+
+; Get 'units' attribute.
+units_id=H5A_OPEN_NAME(data_id, 'Units')
+units=H5A_READ(units_id)
+H5A_CLOSE, units_id
+
+; Close dataset.
+H5D_CLOSE, data_id
+
+; Retrieve lat/lon.
+lat_name='/S1/Latitude'
+lat_id=H5D_OPEN(file_id, lat_name)
+lat=H5D_READ(lat_id)
+H5D_CLOSE, lat_id
+
+lon_name='/S1/Longitude'
+lon_id=H5D_OPEN(file_id, lon_name)
+lon=H5D_READ(lon_id)
+H5D_CLOSE, lon_id
+
+; Close file.
+H5F_CLOSE, file_id
+
+; Process missing value, convert dataf that are equal to missingvaluef to NaN
+idx = where(dataf eq fv, cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+; Subset at nchan1=0.
+dataf = dataf[0,*,*]
+
+; Compute data min/max for colorbar.
+datamin=MIN(dataf, /NAN)
+datamax=MAX(dataf, /NAN)
+dim=SIZE(dataf,/dim)
+
+; Generate the plot.
+SET_PLOT, 'Z'
+levels = 254
+DEVICE, SET_RESOLUTION=[800,600], SET_PIXEL_DEPTH=24, DECOMPOSED=0
+LOADCT, 33, NCOLORS=levels, BOTTOM=1
+
+
+; Plot the trajectory on a zoomed map.
+MAP_SET, /GRID, /CONTINENTS, $
+         POSITION=[0.05, 0.05, 0.82, 0.82], $ 
+         /NOERASE
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+
+long_name = datafield_name + ' (nchan1=0)'
+
+; Draw file name, field name, and unit.
+XYOUTS, 0.05, 0.86, /NORMAL, 'FIELD:' + long_name, $
+  CHARSIZE=0.9,  ALIGNMENT=0.0
+XYOUTS, 0.98, 0.86, /Normal, 'UNIT:' + units, $ 
+  CHARSIZE=0.9,  ALIGNMENT=1.0
+XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+  CHARSIZE=1.3,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+; If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [1]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+; If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+; Add the coyote directory that you created on your machine to your IDL
+; path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+; If you don't need a color bar in your plot, you can ignore this step
+; by adding comment character ';' at the beginning of the code.
+
+COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+    POSITION=[0.9,0.08,0.94,0.8]
+
+; Write PNG image file.
+im = TVRD(TRUE=1)
+png = file_name + '.idl.png'   
+WRITE_PNG, png, im
+EXIT
+
+; Reference
+;
+; [1] http://www.dfanning.com/documents/programs.html

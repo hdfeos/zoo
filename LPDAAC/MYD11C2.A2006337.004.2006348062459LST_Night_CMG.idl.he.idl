@@ -1,0 +1,183 @@
+;  This example code illustrates how to access and visualize LP DAAC MYD11C2
+; Grid file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Define file name, grid name, and data field.
+file_name='MYD11C2.A2006337.004.2006348062459.hdf'
+grid_name='MODIS_8DAY_0.05DEG_CMG_LST'
+datafield_name='LST_Night_CMG'
+
+; Open file.
+file_id = EOS_GD_OPEN(file_name)
+
+; Retrieve data.
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+status = EOS_GD_READFIELD(grid_id, datafield_name, data)
+status = EOS_GD_GRIDINFO(grid_id, xdimsize, ydimsize, upleft, lowright)
+status = EOS_GD_PIXREGINFO(grid_id, pixregcode)
+status = EOS_GD_DETACH(grid_id)
+
+; Close file.
+status = EOS_GD_CLOSE(file_id)
+
+; Retrieve long_name, _FillValue, units, scale_factor, valid_range,
+; and add_offset attributes.
+file_id_hdf=HDF_SD_START(file_name, /READ)
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+valid_range_index=HDF_SD_ATTRFIND(sds_id, 'valid_range')
+HDF_SD_ATTRINFO, sds_id, valid_range_index, data=valid_range
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+scalefactor_index=HDF_SD_ATTRFIND(sds_id, 'scale_factor')
+HDF_SD_ATTRINFO, sds_id, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(sds_id, 'add_offset')
+HDF_SD_ATTRINFO, sds_id, offset_index, DATA=offset
+
+HDF_SD_ENDACCESS, sds_id
+HDF_SD_END, file_id_hdf
+
+; Compute lat / lon data.
+; 
+; We assume that HDFE_CENTER is 0 by default. See GDdefpixreg() in 
+; "HDF-EOS Library Users Guide for the ECS Project Volume 2: Function
+; Reference Guide".
+IF (pixregcode EQ 1) THEN PRINT, 'ERROR:Pixel is not centered.' 
+IF (pixregcode EQ 1) THEN EXIT
+
+; Pixel must be centered.
+offsetX = 0.5
+offsetY = 0.5
+
+; We need to readjust the limits of latitude and longitude. 
+; HDF-EOS is using DMS(DDDMMMSSS.SS) format to represent degrees.
+; To calculate the lat and lon in degrees, one needs to convert
+; minutes and seconds into degrees. 
+
+; The following is the detailed description on how to calculate the
+; latitude  and longitude range based on lowright and upleft.
+; One should observe the fact that 1 minute is 60 seconds and 1 degree 
+; is 60 minutes. 
+
+; First calculate the difference of .SS between lowright and upleft.
+; Since the resulting number is very large, you need to specify /L64.
+lowright_ss= lowright*100-FLOOR(lowright, /L64)*100
+upleft_ss = upleft*100-FLOOR(upleft, /L64)*100;
+dss = lowright_ss - upleft_ss;
+
+; Calculate the difference of SSS between lowright and upleft.
+lowright_s = FLOOR(lowright) MOD 1000
+upleft_s = FLOOR(upleft) MOD 1000
+ds = lowright_s - upleft_s +dss/100;
+
+; Calculate the difference of MMM between lowright and upleft.
+lowright_m = FLOOR(lowright/1000) MOD 1000
+upleft_m = FLOOR(upleft/1000) MOD 1000
+dm = lowright_m-upleft_m +ds/60;
+
+; Calculate the difference of DDD between lowright and upleft.
+lowright_d = FLOOR(lowright/1000000)
+upleft_d = FLOOR(upleft/1000000)
+dd = lowright_d-upleft_d+dm/60
+
+lat_limit = dd(1);
+lon_limit = dd(0);
+
+; We need to calculate the grid space interval between two adjacent points.
+scaleX = lon_limit/xdimsize
+scaleY = lat_limit/ydimsize
+
+lon_value= FINDGEN(xdimsize)
+lat_value= FINDGEN(ydimsize)
+FOR i=0,xdimsize-1 DO lon_value(i) = (i+offsetX)*(scaleX) + upleft_d(0);
+FOR j=0,ydimsize-1 DO lat_value(j) = (j+offsetX)*(scaleY) + upleft_d(1);
+
+lon = FLOAT(lon_value)
+lat = FLOAT(lat_value)
+
+; Convert data type.
+dataf=FLOAT(data)
+
+; Process fillvalue.
+idx=WHERE(data EQ fillvalue(0), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Process valid_range.
+idx=WHERE(data LT valid_range(0) OR data GT valid_range(1), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Apply scale factor and offset according to the attribute
+; "LST = LST data * scale_factor".
+dataf = dataf * scale_factor(0)
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; Generate a plot.
+levels = 254
+DEVICE, DECOMPOSED=0
+LOADCT, 33, NCOLORS=levels, BOTTOM=1
+WINDOW, TITLE = 'FIELD:' + long_name(0)+'   '+'UNIT:'+units
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+ POSITION=[0.05, 0.05, 0.82, 0.82]
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_COLORS=Indgen(levels)+3, $
+  NLEVELS=levels
+MAP_GRID, /BOX_AXES
+MAP_CONTINENTS
+
+; Draw file name, field name, and unit.
+XYOUTS, 0.05, 0.86, /NORMAL, 'FIELD:' + long_name(0), $ 
+  CHARSIZE=1.25,  ALIGNMENT=0.0
+XYOUTS, 0.94, 0.86, /Normal, 'UNIT:' + units, $ 
+  CHARSIZE=1.25,  ALIGNMENT=1.0
+XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+  CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+;   If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [1]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+;   Add the coyote directory that you created on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+;   We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need a color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+ POSITION=[0.9,0.05,0.94,0.8]
+
+; Reference
+;
+; [1] http://www.dfanning.com/documents/programs.html

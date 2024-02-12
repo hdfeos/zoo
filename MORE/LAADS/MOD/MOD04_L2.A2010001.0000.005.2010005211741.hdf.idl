@@ -1,0 +1,117 @@
+;
+;  This example code illustrates how to access and visualize LAADS MODIS
+;  swath file in IDL. 
+;
+;  If you have any questions, suggestions, comments on this example, please 
+; use the HDF-EOS Forum (http://hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org 
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;                               
+; %idl MOD04_L2.A2010001.0000.005.2010005211741.hdf.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2017-11-20
+;
+; Open file.
+file_name='MOD04_L2.A2010001.0000.005.2010005211741.hdf'
+file_id=EOS_SW_OPEN(file_name)
+
+
+; Open swath.
+SWATH_NAME='mod04'
+swath_id=EOS_SW_ATTACH(file_id, SWATH_NAME)
+
+; Read data field.
+DATAFIELD_NAME='Cloud_Fraction_Land'
+status=EOS_SW_READFIELD(swath_id,DATAFIELD_NAME,data)
+
+; Read lat/lon.
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+
+; Read fillv alue.
+status=EOS_SW_GETFILLVALUE(swath_id, DATAFIELD_NAME, fillvalue)
+
+; Close file.
+status=EOS_SW_DETACH(swath_id)
+status=EOS_SW_CLOSE(file_id)
+
+; Read units and scale attribute values.
+file_name='MOD04_L2.A2010001.0000.005.2010005211741.hdf'
+newFileID=HDF_SD_START(file_name, /READ)
+
+DATAFIELD_NAME='Cloud_Fraction_Land'
+index = HDF_SD_NAMETOINDEX(newFileID, DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+long_name_index=HDF_SD_ATTRFIND(thisSdsID, 'long_name')
+HDF_SD_ATTRINFO, thisSdsID, long_name_index, DATA=long_name
+
+
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+scalefactor_index=HDF_SD_ATTRFIND(thisSdsID, 'scale_factor')
+HDF_SD_ATTRINFO, thisSdsID, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(thisSdsID, 'add_offset')
+HDF_SD_ATTRINFO, thisSdsID, offset_index, DATA=offset
+
+; Retrive fill value of lat/lon.
+lon_name='Longitude'
+index = HDF_SD_NAMETOINDEX(newFileID, lon_name)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+lonfil_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, lonfil_index, DATA=fillvalue_lon
+
+lat_name='Latitude'
+index = HDF_SD_NAMETOINDEX(newFileID, lat_name)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+latfil_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, latfil_index, DATA=fillvalue_lat
+
+HDF_SD_END, newFileID
+
+; Convert data type to float.
+dataf=float(data)
+; Process fill values.
+idx=where(data eq fillvalue(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+; Apply scale and offset.
+dataf=(scale_factor(0))*(dataf-offset(0))
+
+
+; Get min/max value of data.
+datamin=min(dataf, /NAN)
+datamax=max(dataf, /NAN)
+
+
+; Process fill values of longitude.
+idx=where(lon eq fillvalue_lon(0), cnt)
+if cnt gt 0 then lon[idx] = !Values.F_NAN
+
+; Process fill values of latitude.
+idx=where(lat eq fillvalue_lon(0), cnt)
+if cnt gt 0 then lat[idx] = !Values.F_NAN
+
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.05, 0.2, FONT_SIZE=8, long_name)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

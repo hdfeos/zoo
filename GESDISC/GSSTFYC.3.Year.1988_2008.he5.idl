@@ -1,0 +1,84 @@
+;
+;  This example code illustrates how to access and visualize MEaSUREs GSSTFYC
+; HDF-EOS5 Grid file in IDL.
+;
+;  If you have any questions, suggestions, comments on this example, please 
+; use the HDF-EOS Forum (http://hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or 
+; post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Usage:
+;
+;  $idl GSSTFYC.3.Year.1988_2008.he5.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2021-02-11
+
+; Open file.
+  file_name='GSSTFYC.3.Year.1988_2008.he5'
+  file_id=H5F_OPEN(file_name)
+
+  datafield_name='/HDFEOS/GRIDS/NCEP/Data Fields/SST'
+  data_id=H5D_OPEN(file_id,datafield_name)
+
+
+  dataspace_id=H5D_GET_SPACE(data_id)
+  dims=H5S_GET_SIMPLE_EXTENT_DIMS(dataspace_id)
+  dims=float(dims)
+
+; Convert data type for division operator.
+  lon_dims=dims(0)
+  lat_dims=dims(1)
+
+
+  data=H5D_READ(data_id)
+
+; Get units
+  units_id=H5A_OPEN_NAME(data_id, 'units')
+  units=H5A_READ(units_id)
+
+; Get fillvalue
+  fillvalue_id=H5A_OPEN_NAME(data_id,'_FillValue')
+  fillvalue=H5A_READ(fillvalue_id)
+
+
+; Get longname
+  longname_id=H5A_OPEN_NAME(data_id,'LongName')
+  longname=H5A_READ(longname_id)
+
+  H5A_Close, longname_id
+  H5A_Close, fillvalue_id
+  H5D_Close, data_id
+
+
+; Get max and min value of data.
+  idx=where(data ne fillvalue(0), cnt)
+  if cnt gt 0 then datamin=min(data[idx])
+  if cnt gt 0 then datamax=max(data[idx])
+
+; Process fill value, convert data that are equal to fillvalue to NaN
+  idx=where(data eq fillvalue(0), cnt)
+  if cnt gt 0 then data[idx] = !Values.F_NAN
+
+
+; Calculate the latitude and longitude range based on vector points
+; and lat/lon step
+  lat=FINDGEN(lat_dims)*(180.0/lat_dims)-90
+  lon=FINDGEN(lon_dims)*(360.0/lon_dims)-180
+
+; Generate a plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.15, 0.2, longname)
+c1 = CONTOUR(data, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, $
+              POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

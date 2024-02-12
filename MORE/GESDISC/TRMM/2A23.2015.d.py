@@ -1,5 +1,5 @@
 """
-This example code illustrates how to read multiple GES DISC 2A23 Swath
+This example code illustrates how to read multiple GES DISC 2A23 Grid
 files and calculate daily average over South Africa region in Python.
 
 If you have any questions, suggestions, or comments on this example, please use

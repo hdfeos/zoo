@@ -1,0 +1,120 @@
+;  This example code illustrates how to access and visualize NSIDC AMSR_E
+; Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Define file name, swath name, and data field.
+FILE_NAME='AMSR_E_L2_Ocean_V06_200206190029_D.hdf'
+SWATH_NAME='Swath1'
+DATAFIELD_NAME='High_res_cloud'
+
+; Open file.
+file_id=EOS_SW_OPEN(FILE_NAME)
+
+; Attach Swath.
+swath_id=EOS_SW_ATTACH(file_id, SWATH_NAME)
+
+; Retrieve data.
+status=EOS_SW_READFIELD(swath_id,DATAFIELD_NAME,data)
+
+; Retrieve lat/lon.
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+
+; Detach Swath.
+status=EOS_SW_DETACH(swath_id)
+
+; Close file.
+status=EOS_SW_CLOSE(file_id)
+
+; Retrieve "Unit" and "Scale" attributes.
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+index = HDF_SD_NAMETOINDEX(newFileID, DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'Unit')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+scalefactor_index=HDF_SD_ATTRFIND(thisSdsID, 'Scale')
+HDF_SD_ATTRINFO, thisSdsID, scalefactor_index, DATA=scale_factor
+
+HDF_SD_END, newFileID
+
+; Read fill value directly from data.
+fillvalue=-9990
+
+; Convert data type.
+dataf=float(data)
+
+; Process fill value.
+dataf[WHERE(data EQ fillvalue)] = !Values.F_NAN
+
+; Apply scale factor. There's no offset attribute. See also [1].
+dataf=(scale_factor(0))*dataf
+
+; Get max and min value of data.
+datamin = min(dataf, /NAN)
+datamax = max(dataf, /NAN)
+
+
+; Generate the plot.
+levels=30
+DEVICE, DECOMPOSED=0
+Window, TITLE = 'FIELD:' + DATAFIELD_NAME + '  '+'UNIT:'+units
+LoadCT,33, Ncolors=levels, Bottom=1
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+  POSITION=[0.05, 0.05, 0.82, 0.82]
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_Colors=Indgen(levels)+3, $
+ Background=1, NLEVELS=levels, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+
+; Draw title and unit.
+XYOuts, 0.05, 0.86, /Normal, 'FIELD:' + DATAFIELD_NAME, $
+  Charsize=1.25, color=black, Alignment=0.0
+XYOuts, 0.82, 0.86, /Normal, 'UNIT:' + units, $ 
+  Charsize=1.25, Color=black, Alignment=1.0
+XYOuts, 0.43, 0.92, /Normal, FILE_NAME, $
+  Charsize=1.75, Color=black, Alignment=0.5
+
+; The following code is prepared for colorbar. 
+;
+;   If you require colorbar in your plot, you could download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' ahead of coding. 
+;
+;    Add the coyote directory you create on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, Range=[datamin, datamax], Ncolors=levels, /Vertical, $ 
+  Position=[0.9,0.05,0.94,0.8], FORMAT='(F5.2)'
+
+
+; Reference
+; [1] AMSR-E/Aqua L2B and L3 Ocean Products
+;     http://nsidc.org/data/docs/ae_ocean_products.gd.html
+; [2] Coyote's Guide to IDL Programming.
+;     http://wOww.dfanning.com/documents/programs.html

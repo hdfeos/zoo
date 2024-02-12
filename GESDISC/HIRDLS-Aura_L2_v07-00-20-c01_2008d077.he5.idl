@@ -1,0 +1,119 @@
+;
+; This example code illustrates how to access and visualize GES DISC
+; HIRDLS Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl HIRDLS-Aura_L2_v07-00-20-c01_2008d077.he5.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2019-11-05
+
+; Open file
+file_name='HIRDLS-Aura_L2_v07-00-20-c01_2008d077.he5'
+file_id=H5F_OPEN(file_name)
+
+; Open dataset.
+datafield_name='/HDFEOS/SWATHS/HIRDLS/Data Fields/O3'
+data_id=H5D_OPEN(file_id,datafield_name)
+
+; Get units attribute.
+units_id=H5A_OPEN_NAME(data_id, 'Units')
+units=H5A_READ(units_id)
+H5A_CLOSE, units_id
+
+; Get title attribute.
+title_id=H5A_OPEN_NAME(data_id, 'Title')
+long_name=H5A_READ(title_id)
+H5A_CLOSE, title_id
+
+; Get missing value attribute.
+missingvalue_id=H5A_OPEN_NAME(data_id,'MissingValue')
+missingvalue=H5A_READ(missingvalue_id)
+H5A_CLOSE, missingvalue_id
+
+; Read data.
+data=H5D_READ(data_id)
+
+H5D_CLOSE, data_id
+
+; Open pressure dataset.
+pressure_name='/HDFEOS/SWATHS/HIRDLS/Geolocation Fields/Pressure'
+pressure_id=H5D_OPEN(file_id, pressure_name)
+
+; Get units attribute.
+pressure_units_id=H5A_OPEN_NAME(pressure_id, 'Units')
+pressure_units=H5A_READ(pressure_units_id)
+H5A_CLOSE, pressure_units_id
+
+; Get title attribute.
+pressure_title_id=H5A_OPEN_NAME(pressure_id, 'Title')
+pressure_long_name=H5A_READ(pressure_title_id)
+H5A_CLOSE, pressure_title_id
+
+; Read data.
+pressure=H5D_READ(pressure_id)
+H5D_CLOSE, pressure_id
+
+
+; Open time dataset.
+time_name='/HDFEOS/SWATHS/HIRDLS/Geolocation Fields/Time'
+time_id=H5D_OPEN(file_id, time_name)
+
+; Read data.
+time=H5D_READ(time_id)
+H5D_CLOSE, time_id
+
+
+; Set subset index.
+index = 0
+
+; Time's unit is TAI-93.
+; Compute the real time.
+; We don't count in leap second [1] which will give about 7 seconds ahead
+; of the real measurement time.
+time_at = time(index)
+start_time = JULDAY(1,1,1993, 0, 0, 0)
+sec = time_at / 86400
+t = start_time + sec
+CALDAT, t, Mo, D, Y, H, Mi, S
+tstring = STRING(Y, FORMAT='(I4)') + '-' + STRING(Mo, FORMAT='(I2.2)') + $
+          '-' + STRING(D, FORMAT='(I2.2)') + ' ' + STRING(H, FORMAT='(I2.2)') $ 
+          + ':' + STRING(Mi, FORMAT='(I2.2)') + ':' + STRING(S, FORMAT='(I2.2)')
+
+; Subset data.
+data=data(*,index)
+
+; Process missing value, convert data that are equal to missingvalue to NaN
+idx=where(data eq missingvalue(0), cnt)
+if cnt gt 0 then data[idx] = !Values.F_NAN
+
+x_label = long_name + ' (' + units + ')'
+y_label = pressure_long_name + ' (' + pressure_units + ')'
+t_label = file_name + '!C!C' + long_name + ' at Time=' + tstring
+
+; Reverse Y-axis for pressure using YRANGE.
+d_max=MAX(pressure)
+d_min=MIN(pressure)
+
+; Draw a line plot.
+p = PLOT(data, pressure, $
+         YTITLE=y_label, XTITLE=x_label, TITLE=t_label, $
+         XTICKFONT_SIZE=8, YTICKFONT_SIZE=8, YRANGE=[d_max, d_min], $
+         /YLOG, /BUFFER)         
+png = file_name + '.idl.png'
+p.save, png, HEIGHT=600, WIDTH=800
+EXIT
+
+
+; Reference
+;
+; [1] http://maia.usno.navy.mil/ser7/tai-utc.dat

@@ -1,0 +1,130 @@
+;
+;  This example code illustrates how to access and visualize LP DAAC MCD12C1
+; Grid file in IDL. 
+;
+;  If you have any questions, suggestions, comments on this example, please 
+; use the HDF-EOS Forum (http: //hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or
+; post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl MCD12C1.A2009001.006.2018053184946.hdf.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2021-10-12
+
+; Define file name,  grid name, and datafield.
+file_name='MCD12C1.A2009001.006.2018053184946.hdf'
+grid_name='MOD12C1'
+datafield_name='Land_Cover_Type_1_Percent'
+
+; Open file.
+file_id = EOS_GD_OPEN(file_name)
+
+; Retrieve data.
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+status = EOS_GD_READFIELD(grid_id, datafield_name, data)
+status = EOS_GD_GRIDINFO(grid_id, xdimsize, ydimsize, upleft, lowright)
+status = EOS_GD_PIXREGINFO(grid_id, pixregcode)
+
+; Close file.
+status = EOS_GD_DETACH(grid_id)
+status = EOS_GD_CLOSE(file_id)
+
+; Retrieve long name, fillvalue, units.
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+index=HDF_SD_NAMETOINDEX(newFileID,DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+long_name_index=HDF_SD_ATTRFIND(thisSdsID, 'long_name')
+HDF_SD_ATTRINFO, thisSdsID, long_name_index, DATA=long_name
+
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+layer_index=HDF_SD_ATTRFIND(thisSdsID, 'Layer 1')
+HDF_SD_ATTRINFO, thisSdsID, layer_index, DATA=layer
+
+
+fillvalue_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, fillvalue_index, DATA=fillvalue
+
+HDF_SD_END, newFileID
+
+; Calcluate lat/lon.
+;
+; We assume that HDFE_CENTER is 0 by default. See GDdefpixreg() in 
+; "HDF-EOS Library Users Guide for the ECS Project Volume 2: Function
+; Reference Guide".
+IF (pixregcode EQ 1) THEN PRINT, 'ERROR:Pixel is not centered.' 
+IF (pixregcode EQ 1) THEN EXIT
+
+
+; We need to readjust the limits of latitude and longitude. 
+; This file is using DDDxxxxxx format to represent degrees.
+;
+; The following is the detailed description on how to calculate the
+; latitude  and longitude range based on lowright and upleft.
+;
+; Calculate the difference of DDD between lowright and upleft.
+lowright_d = floor(lowright)/1000000
+upleft_d = floor(upleft)/1000000
+dd = lowright_d-upleft_d
+lat_limit = dd(1)
+lon_limit = dd(0)
+
+; We need to calculate the grid space interval between two adjacent points.
+scaleX = lon_limit/FLOAT(xdimsize)
+scaleY = lat_limit/FLOAT(ydimsize)
+
+; Pixel must be centered.
+offsetX = scaleX / 2.0
+offsetY = scaleY / 2.0
+
+lon_value= FINDGEN(xdimsize)
+lat_value= FINDGEN(ydimsize)
+FOR i=0,xdimsize-1 DO lon_value(i) = (i+offsetX)*(scaleX) + upleft_d(0);
+FOR j=0,ydimsize-1 DO lat_value(j) = (j+offsetX)*(scaleY) + upleft_d(1);
+
+lon = FLOAT(lon_value)
+lat = FLOAT(lat_value)
+
+; Get min/max value for lat and lon.
+latmin=MIN(lat)
+latmax=MAX(lat)
+lonmin=MIN(lon)
+lonmax=MAX(lon)
+
+data = REFORM(data(1,*,*))
+
+
+; Convert data type.
+dataf=FLOAT(data)
+
+; Process fill value.
+dataf[WHERE(data EQ fillvalue(0))] = !Values.F_NAN
+
+; Get max and min value of data.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; Generate plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, long_name+ ' - ' +layer)
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, $
+              TEXTPOS=1, POSITION=[0.85,0.3,0.87,0.7], TITLE=units)
+
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

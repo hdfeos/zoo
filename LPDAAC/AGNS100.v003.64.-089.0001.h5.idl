@@ -1,0 +1,134 @@
+;
+; This example code illustrates how to access and visualize LP DAAC ASTER
+; GED HDF5 file in IDL. 
+;
+;  If you have any questions, suggestions, comments on this example, please 
+; use the HDF-EOS Forum (http://hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or 
+; post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Tested under: IDL 8.2.3
+; Last updated: 2014-4-3
+
+; Open file.
+file_name='AGNS100.v003.64.-089.0001.h5';
+file_id=H5F_OPEN(file_name)
+
+; Read data.
+datafield_name='/Emissivity/Mean'
+data_id=H5D_OPEN(file_id,datafield_name)
+data=H5D_READ(data_id)
+
+; Read attribute.
+description_id=H5A_OPEN_NAME(data_id, 'Description')
+description=H5A_READ(description_id)
+H5A_CLOSE, description_id
+
+; Close dataset.
+H5D_CLOSE, data_id
+
+; Read latitude.
+latitude_name='/Geolocation/Latitude'
+latitude_id=H5D_OPEN(file_id, latitude_name)
+lat=H5D_READ(latitude_id)
+
+; Close dataset.
+H5D_CLOSE, latitude_id
+
+; Read longitude.
+lon_name='/Geolocation/Longitude'
+lon_id=H5D_OPEN(file_id, lon_name)
+lon=H5D_READ(lon_id)
+
+; Close dataset.
+H5D_CLOSE, lon_id
+
+; Subset data.
+data = data(*,*,1)
+
+; Convert data type.
+dataf=FLOAT(data)
+
+; Process fillvalue.
+idx=WHERE(data EQ -9999, cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Apply scale factor [1].
+dataf = dataf * 0.001
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; Get min/max value for lat and lon for zoomed image.
+latmin=MIN(lat)
+latmax=MAX(lat)
+lonmin=MIN(lon)
+lonmax=MAX(lon)
+
+
+; Generate the plot.
+SET_PLOT, 'Z'
+levels=254
+DEVICE, SET_RESOLUTION=[800,600], SET_PIXEL_DEPTH=24, DECOMPOSED=0
+LOADCT,33, NCOLORS=levels, BOTTOM=1
+MAP_SET, /GRID, /CONTINENTS, /HIRES, XMARGIN=5, YMARGIN=5, $
+         POSITION=[0.05, 0.07, 0.85, 0.84], /NOERASE, $
+         LIMIT=[latmin, lonmin, latmax, lonmax]    
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_COLORS=INDGEN(levels)+3, $
+  NLEVELS=levels
+MAP_GRID, /BOX_AXES
+MAP_CONTINENTS
+
+; Annotate plot.
+long_name = "Mean Emissivity for Band 10"
+units = "None"
+
+; Draw file name, field name, and unit.
+XYOUTS, 0.05, 0.88, /NORMAL, 'FIELD:' + long_name, $
+  CHARSIZE=1.25,  ALIGNMENT=0.0
+XYOUTS, 0.82, 0.88, /NORMAL, 'UNIT:' + units, $ 
+  CHARSIZE=1.25,  ALIGNMENT=1.0
+XYOUTS, 0.43, 0.95, /NORMAL, file_name, $
+  CHARSIZE=1.75,  ALIGNMENT=0.5
+XYOUTS, 0.43, 0.01, /NORMAL, description, $
+  CHARSIZE=0.75,  ALIGNMENT=0.5
+; The following code is prepared for colorbar. 
+;
+;   If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+;   Add the coyote directory that you created on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+;   We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need a color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+ POSITION=[0.93,0.07,0.97,0.84], FORMAT='(F4.2)'
+
+; Write PNG image file.
+  im = TVRD(TRUE=1)
+  WRITE_PNG, file_name+'.idl.png', im
+  EXIT
+
+; References
+;
+; [1] https://lpdaac.usgs.gov/products/community_products_table/agns100
+; [2] http://www.dfanning.com/documents/programs.html

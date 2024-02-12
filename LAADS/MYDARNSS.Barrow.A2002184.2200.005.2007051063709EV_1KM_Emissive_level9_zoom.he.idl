@@ -1,0 +1,176 @@
+;  This example code illustrates how to access and visualize LAADS
+;  MYDARNSS Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Define file name and data field.
+file_name='MYDARNSS.Barrow.A2002184.2200.005.2007051063709.hdf'
+datafield_name='EV_1KM_Emissive'
+datafield_name_lat='Latitude'
+datafield_name_lon='Longitude'
+
+; Open file.
+file_id_hdf=HDF_SD_START(file_name, /READ)
+
+
+; Retrieve data.
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+HDF_SD_GETDATA, sds_id, data
+
+; Retrieve the information.  
+HDF_SD_GETINFO, sds_id, LABEL=l, UNIT=u, FORMAT=f, $  
+   COORDSYS=c, FILL=fill, RANGE=r, $  
+   NDIMS=ndims, DIMS=dims, TYPE=ty  
+
+; Retrieve the dimension name.
+dim_id = HDF_SD_DIMGETID(sds_id, ndims-1)
+HDF_SD_DIMGET, dim_id, NAME=dimname
+
+; Retrieve long_name, _FillValue, units, scale factor, and offset 
+; attributes. 
+; 
+; Please read the "MODIS Level 1B Product User's Guide" [1] 
+; carefully before you proceed.
+;
+; In this example, we'll compute and plot the radiance according to [1].
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+valid_range_index=HDF_SD_ATTRFIND(sds_id, 'valid_range')
+HDF_SD_ATTRINFO, sds_id, valid_range_index, data=valid_range
+
+scalefactor_index=HDF_SD_ATTRFIND(sds_id, 'radiance_scales')
+HDF_SD_ATTRINFO, sds_id, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(sds_id, 'radiance_offsets')
+HDF_SD_ATTRINFO, sds_id, offset_index, data=offset
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'radiance_units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+; End data field access.
+HDF_SD_ENDACCESS, sds_id
+
+
+index=HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name_lat)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+HDF_SD_GETDATA, sds_id, lat
+
+; End latitude field access.
+HDF_SD_ENDACCESS, sds_id
+
+
+DATAFIELD_NAME="Longitude"
+index=HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name_lon)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+HDF_SD_GETDATA, sds_id, lon
+
+; End longitude field access.
+HDF_SD_ENDACCESS, sds_id
+
+; Close file.
+HDF_SD_END, file_id_hdf
+
+; Convert the 3D data to 2D data at EV_1KM_Emissive=0
+lev = 9
+data2D=data[*,*,lev]
+
+; Convert data type.
+dataf=float(data2D)
+
+; Process fillvalue.
+idx=WHERE(data2D EQ fillvalue(0), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Process valid_range.
+idx=WHERE(data2D LT valid_range(0) OR data2D GT valid_range(1), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+
+; Apply scale factor and offset according to [1] that correspond to
+; the subsetting index.
+dataf = scale_factor(lev) * (dataf - offset(lev)) 
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; Get min/max value of lat and lon for zoomed image.
+latmin=MIN(lat)
+latmax=MAX(lat)
+lonmin=MIN(lon)
+lonmax=MAX(lon)
+
+
+; Prepare field name title using long name attribute and dimension name.
+field = 'Radiance derived from ' + long_name(0) + '!C       at ' $
+  + dimname + '=' +  STRING(lev, FORMAT='(I1)')
+
+
+; Generate a plot.
+levels = 254
+DEVICE, DECOMPOSED=0
+LOADCT, 33, NCOLORS=levels, BOTTOM=1
+WINDOW, TITLE = 'FIELD:' + field + '  '+'UNIT:'+units
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+  POSITION=[0.05, 0.05, 0.82, 0.82], LIMIT=[latmin, lonmin, latmax, lonmax]   
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_COLORS=INDGEN(levels)+3, $
+  NLEVELS=levels
+MAP_GRID, /BOX_AXES
+MAP_CONTINENTS
+
+; Draw file name, field name, and unit.
+XYOUTS, 0.01, 0.9, /NORMAL, 'FIELD:' + field, $
+  CHARSIZE=1.25,  ALIGNMENT=0.0
+XYOUTS, 0.99, 0.9, /NORMAL, 'UNIT:' + units, $ 
+  CHARSIZE=1.25,  ALIGNMENT=1.0
+XYOUTS, 0.43, 0.96, /NORMAL, file_name, $
+  CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+;   If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+;   Add the coyote directory that you created on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+;   We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need a color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+ POSITION=[0.9,0.05,0.94,0.8], FORMAT='(F5.2)'
+
+; Write JPEG image file.
+im = TVRD(TRUE=3)
+jpg = 'MYDARNSS.Barrow.A2002184.2200.005.2007051063709EV_1KM_Emissive_level9_zoom.idl.JPG'
+WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; Reference
+;
+; [1] MODIS Level 1B Product User's Guide
+;     http://mcst.gsfc.nasa.gov/uploads/files/M1054_RevC_PUG_022709_Update.pdf
+; [2] http://www.dfanning.com/documents/programs.html

@@ -1,5 +1,4 @@
 """
-Copyright (C) 2014-2018 The HDF Group
 Copyright (C) 2014 John Evans
 
 This example code illustrates how to access and visualize a NSIDC Level-2

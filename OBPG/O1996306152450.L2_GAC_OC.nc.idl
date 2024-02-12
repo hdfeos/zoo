@@ -1,0 +1,111 @@
+;
+;  This example code illustrates how to access and visualize 
+;  OBPG OCTS Swath netCDF-4 file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl O1996306152450.L2_GAC_OC.nc.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2019-12-02
+
+; Open file. 
+file_name='O1996306152450.L2_GAC_OC.nc'
+file_id=H5F_OPEN(file_name)
+
+; Read data.
+datafield_name='/geophysical_data/Rrs_412'
+data_id=H5D_OPEN(file_id,datafield_name)
+data=H5D_READ(data_id)
+
+; Get title.
+long_name_id=H5A_OPEN_NAME(data_id, 'long_name')
+long_name=H5A_READ(long_name_id)
+H5A_Close, long_name_id
+
+; Get units.
+units_id=H5A_OPEN_NAME(data_id, 'units')
+units=H5A_READ(units_id)
+H5A_Close, units_id
+
+; Get fill value.
+fv_id=H5A_OPEN_NAME(data_id, '_FillValue')
+fillvalue=H5A_READ(fv_id)
+H5A_Close, fv_id
+
+; Get scale_factor.
+sf_id=H5A_OPEN_NAME(data_id, 'scale_factor')
+scale_factor=H5A_READ(sf_id)
+H5A_Close, sf_id
+
+; Get add_offset.
+ao_id=H5A_OPEN_NAME(data_id, 'add_offset')
+add_offset=H5A_READ(ao_id)
+H5A_Close, ao_id
+
+; Close dataset.
+H5D_Close, data_id
+
+; Read latitude.
+latitude_name='/navigation_data/latitude'
+latitude_id=H5D_OPEN(file_id, latitude_name)
+lat=H5D_READ(latitude_id)
+
+; Close dataset.
+H5D_Close, latitude_id
+
+; Read longitude.
+lon_name='/navigation_data/longitude'
+lon_id=H5D_OPEN(file_id, lon_name)
+lon=H5D_READ(lon_id)
+
+; Close dataset.
+H5D_Close, lon_id
+
+; Close file.
+H5F_Close, file_id
+
+; Convert type to double.
+dataf = float(data)
+
+; Process fill value.
+idx=where(data eq fillvalue, cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+; Handle scale and offset.
+dataf = scale_factor(0) * dataf + add_offset(0)
+datamin=MIN(dataf)
+datamax=MAX(dataf)
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+
+; Dataset has fill value. Use color table that starts with white color.
+ct = COLORTABLE(22)
+
+t1 = TEXT(0.35, 0.2, long_name)
+
+; We use SCATTERPLOT because data is 2-d lat/lon swath.
+; lon[*]/lat[*]/dataf[*] will make 1-d dataset.
+c1 = SCATTERPLOT(lon[*], lat[*], OVERPLOT=m, $
+                 MAGNITUDE = dataf[*], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+
+; We need custom colorbar because we use SCATTERPLOT().
+; We cannot use TARGET=c1.
+
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

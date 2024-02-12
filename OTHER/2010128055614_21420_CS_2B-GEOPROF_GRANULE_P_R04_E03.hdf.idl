@@ -1,0 +1,144 @@
+;  This example code illustrates how to access and visualize CDPC CloudSat 
+; Swath file in IDL. 
+;
+;  If you have any questions, suggestions, comments on this example, please use
+; the HDF-EOS Forum (http://hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or 
+; post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Tested under: IDL 8.0.0
+; Last updated: 2011-11-16
+
+; Open file.
+file_name='2010128055614_21420_CS_2B-GEOPROF_GRANULE_P_R04_E03.hdf'
+
+; Define Swath name.
+swath_name='2B-GEOPROF'
+file_id=EOS_SW_OPEN(file_name)
+swath_id=EOS_SW_ATTACH(file_id, swath_name)
+
+; Read data.
+datafield_name='Radar_Reflectivity'
+status=EOS_SW_READFIELD(swath_id, datafield_name, data)
+datafield_name='Longitude'
+status=EOS_SW_READFIELD(swath_id, datafield_name, lon)
+datafield_name='Latitude'
+status=EOS_SW_READFIELD(swath_id, datafield_name, lat)
+datafield_name='Height'
+status=EOS_SW_READFIELD(swath_id, datafield_name, lev)
+datafield_name='Profile_time'
+status=EOS_SW_READFIELD(swath_id, datafield_name, time)
+
+; Read attributes.
+attr_name = 'Radar_Reflectivity.long_name'
+status=EOS_SW_READATTR(swath_id, attr_name, long_name)
+attr_name = 'Radar_Reflectivity.units'
+status=EOS_SW_READATTR(swath_id, attr_name, units)
+attr_name = 'Radar_Reflectivity.factor'
+status=EOS_SW_READATTR(swath_id, attr_name, scale_factor)
+attr_name = 'Radar_Reflectivity.valid_range'
+status=EOS_SW_READATTR(swath_id, attr_name, valid_range)
+attr_name = 'Height.units'
+status=EOS_SW_READATTR(swath_id, attr_name, units_height)
+attr_name = 'Profile_time.long_name'
+status=EOS_SW_READATTR(swath_id, attr_name, long_name_time)
+attr_name = 'Profile_time.units'
+status=EOS_SW_READATTR(swath_id, attr_name, units_time)
+
+; Detach swath.
+status=EOS_SW_DETACH(swath_id)
+
+; Close file.
+status=EOS_SW_CLOSE(file_id)
+
+; Convert type to double.
+dataf = float(data)
+
+; Process valid_range. Fill value and missing value will be handled by this
+; since they are outside of range values.
+idx=where(data lt valid_range(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+idx=where(data gt valid_range(1), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+; Apply scale factor according to [1].
+dataf = dataf / scale_factor(0)
+
+; Although 2D height values are all slightly different at each profile 
+; time, the difference is not significant. Pick the first one only since
+; we don't know how to align data along 2-D height axis.
+lev0 = lev(*,0)
+
+dataf = TRANSPOSE(dataf)
+
+; Generate the plot.
+levels = 200
+DEVICE, DECOMPOSED=0
+LOADCT, 33, NCOLORS=levels, BOTTOM=3
+WINDOW,Title=FILE_NAME, XSIZE=800, YSIZE=1200
+CONTOUR, dataf, time, lev0, $
+         /FILL, C_Colors=Indgen(levels)+3, $
+         Background=1, NLEVELS=levels,  $
+         XTITLE=long_name_time+' (' + units_time + ')', $
+         YTITLE='Height (' + units_height  + ')', $
+         POSITION=[0.1, 0.5, 0.82, 0.82], /NOERASE
+
+XYOuts, 0.1, 0.85, /NORMAL, 'FIELD:' + long_name, $
+        CHARSIZE=1.25,  ALIGNMENT=0.0
+XYOuts, 0.82, 0.85, /NORMAL, 'UNIT:' + units, $ 
+        CHARSIZE=1.25,  ALIGNMENT=1.0
+XYOuts, 0.43, 0.92, /NORMAL, file_name, $
+        CHARSIZE=1.75,  ALIGNMENT=0.5
+
+;   The following code is prepared for colorbar. 
+;
+;   If you require colorbar in your plot, you could download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' ahead of coding. 
+;
+;    Add the coyote directory you create on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; Let's assume that you've installed coyote library under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+datamin=min(dataf, /NAN)
+datamax=max(dataf, /NAN)
+COLORBAR, Range=[datamin,datamax], Ncolors=levels, /Vertical, $
+ Position=[0.9,0.5,0.94,0.8]
+
+; Plot the trajectory on map.
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+         POSITION=[0.1, 0.1, 0.82, 0.4], /NOERASE
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+OPLOT, lon, lat
+PLOTS, lon(0), lat(0), COLOR=150, PSYM=1, SYMSIZE=2, THICK=2
+XYOUTS, 0.43, 0.43, /NORMAL, 'Trajectory of Satellite Path (+:starting point)', $
+        CHARSIZE=1.75, COLOR=255, ALIGNMENT=0.5
+
+; Write JPEG image file.
+im = TVRD(TRUE=3)
+jpg = file_name + '.idl.jpg'   
+WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+;  References
+;
+; [1] http://www.cloudsat.cira.colostate.edu/dataSpecs.php
+; [2] http://www.dfanning.com/documents/programs.html
+; [3] http://homepages.see.leeds.ac.uk/~lecjm/Teaching/IDL_course/Notes/notes/node31.html

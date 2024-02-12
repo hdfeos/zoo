@@ -1,0 +1,161 @@
+;  This example code illustrates how to access and visualize LaRC_MISR Grid 
+; file in IDL. 
+;  If you have any questions, suggestions, comments on this example, please 
+; use the HDF-EOS Forum (http: //hdfeos.org/forums). 
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or
+; post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+
+; Define file name,  grid name, and datafield.
+FILE_NAME='MISR_AM1_GRP_ELLIPSOID_GM_P117_O058421_BA_F03_0024.hdf'
+GRID_NAME='BlueBand'
+DATAFIELD_NAME='Blue Radiance/RDQI'
+
+; Open file.
+file_id = EOS_GD_OPEN(FILE_NAME)
+
+; Retrieve data.
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, data3D)
+; See if "Scale factor" attribute is accessible through EOS_GD APIs.
+; The existence of the "Scale facotr" can be verified using HDFView.
+; It is stored under "/BlueBand/Grid Attributes/Scale factor" Vdata.
+;
+; Uncomment the following two lines to see the list of attributes.
+; status = EOS_GD_INQATTRS(grid_id, attrlist)
+; PRINT, attrlist
+; Read the "Scale factor" attribute.
+status = EOS_GD_READATTR(grid_id, 'Scale factor', val)
+; Uncomment the following line to confirm the value of scale factor.
+;PRINT, val(0)
+; Save it.
+scale_factor = val(0)
+status = EOS_GD_GETFILLVALUE(grid_id, DATAFIELD_NAME, fill_value)
+; Close file.
+status = EOS_GD_DETACH(grid_id)
+status = EOS_GD_CLOSE(file_id)
+
+; Open the file that has geo-location information.
+; The satellite path information in the file name should match. 
+; For this example case, the "P117" must match.
+FILE_NAME_GEO = 'MISR_AM1_AGP_P117_F01_24.hdf'
+GRID_NAME_GEO = 'Standard'
+file_id_geo = EOS_GD_OPEN(FILE_NAME_GEO)
+grid_id_geo = EOS_GD_ATTACH(file_id_geo, GRID_NAME_GEO)
+
+; Retrieve lat & lon.
+status = EOS_GD_READFIELD(grid_id_geo, 'GeoLatitude', lat3D)
+status = EOS_GD_READFIELD(grid_id_geo, 'GeoLongitude', lon3D)
+
+; Close file.
+status = EOS_GD_DETACH(grid_id_geo)
+status = EOS_GD_CLOSE(file_id_geo)
+
+; We need to shift bits for RDQI to get blue band only. 
+; See the page 84 of "MISR Data Products Specifications (rev. S)".
+; The document is available at [1].
+; Right shift is -2 according to [2].
+data3Ds = ISHFT(data3D, -2)
+
+; To use !Values.F_NAN in IDL, change ushort16 integer type to float.
+data3Df = float(data3Ds);
+
+; Convert data that are equal to _FillValue to IDL NaN.
+idx=where(data3D eq fill_value, cnt)
+if cnt gt 0 then data3Df[idx]=!Values.F_NAN
+
+; Filter out values (> 16376) used for "Flag Data".
+; See Table 1.2 in "Level 1 Radiance Scaling and Conditioning
+; Algorithm  Theoretical Basis" document [3].
+idx = where(data3Ds gt 16376, cnt)
+if cnt gt 0 then data3Df[idx] = !Values.F_NAN
+
+dimsize = size(data3D,/dim)
+numlat = dimsize(0)
+numlon = dimsize(1)
+nblock = dimsize(2)
+
+; Convert the 3D data into 2D data.
+data=FINDGEN(numlat*nblock,numlon)
+; Convert data type.
+data=float(data)
+
+for k=0,nblock-1 do $
+  for i=0,numlat-1 do $
+    for j=0, numlon-1 do $ 
+      data(k*numlat+i,j)=data3Df(i,j,k)  
+help, data
+
+
+; Apply scale factor.
+data = data * float(scale_factor)
+
+; Get max and min value of data.
+idx=where(data ne !Values.F_NAN, cnt)
+if cnt gt 0 then datamin=FLOOR(MIN(data[idx], /NAN))
+if cnt gt 0 then datamax=CEIL(MAX(data[idx], /NAN))
+
+lat=FINDGEN(numlat*nblock,numlon)
+
+for k=0,nblock-1 do $
+  for i=0,numlat-1 do $
+    for j=0, numlon-1 do $
+       lat(k*numlat+i,j)=lat3D(i,j,k)
+
+lon=FINDGEN(numlat*nblock,numlon)
+
+for k=0,nblock-1 do $
+ for i=0,numlat-1 do $ 
+  for j=0, numlon-1 do $
+    lon(k*numlat+i,j)=lon3D(i,j,k)
+
+; The following coding is prepared for colorbar. 
+; If you require colorbar in your plot, you could download
+; "Dr. Fanning's Coyote Library" from [4].
+;
+;  Make a directory named coyote somewhere on your machine, and
+;  extract the  Coyote files into it. 
+; If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' ahead of coding. 
+;
+; Add the coyote directory you create on your machine to your IDL path.
+;  !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+; Generate the plot.
+levels=254
+device,decomposed=0
+LoadCT,33, Ncolors=levels, Bottom=1
+WINDOW, Title=FILE_NAME +':Blue Radiance'
+MAP_SET, /MERCATOR, /CONTINENTS, XMARGIN=5, YMARGIN=5,$
+  POSITION=[0.05, 0.05, 0.82, 0.84]
+CONTOUR, data, lon, lat, /OVERPLOT, /Cell_FILL, C_Colors=Indgen(levels)+3, $
+  Background=1, NLEVELS=levels, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+XYOuts, 0.05, 0.87, /Normal, 'Blue Radiance', Charsize=1.25, color=black, $
+  Alignment=0.0
+; The unit is obtained from [1] and [3].
+; The unit involves greek \mu character: !4 + String("154B) + '!X
+XYOuts, 0.82, 0.87, /Normal, $
+  'unit:Wm!E-2!Nsr!E-1!N!4'+ String("154B) + '!Xm!E-1', $
+   Charsize=1.25, Color=black, Alignment=1.0
+XYOuts, 0.43, 0.92, /Normal, file_name, Charsize=1.75, Color=black, $
+  Alignment=0.5
+
+;  The following coding is to generate color bar if you have already
+; downloaded and installed Dr. Fanning's Coyote Library and add the
+; coyote directory above. 
+;  If you don't need color bar in your plot, you can ignore this step
+; and add comment character ';' at the beginning of the line.
+COLORBAR, Range=[datamin, datamax], Ncolors=levels, /Vertical, $
+  Position=[0.9,0.1,0.94,0.9]
+;
+; References
+; 
+; [1] https://asdc.larc.nasa.gov/documents/misr/DPS_v50_RevS.pdf
+; [2] http://idlastro.gsfc.nasa.gov/idl_html_help/ISHFT.html.
+; [3] https://eospso.gsfc.nasa.gov/atbd-category/45
+; [4] http://www.dfanning.com/documents/programs.html. 

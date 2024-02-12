@@ -1,0 +1,91 @@
+;
+;  This example code illustrates how to access and visualize LaRC
+;  ASDC CERES SSF NPP VIIRS HDF4 file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl CER_SSF1deg-Hour_NPP-VIIRS_Edition2A_200203.20190930.hdf.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2022-10-25
+
+; Open file.
+file_name='CER_SSF1deg-Hour_NPP-VIIRS_Edition2A_200203.20190930.hdf'
+file_id_hdf=HDF_SD_START(file_name, /READ)
+
+; Read data.
+datafield_name='clr_toa_lw'
+index=HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+HDF_SD_GETDATA, sds_id, data
+
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+HDF_SD_ENDACCESS, sds_id
+
+; Read latitude.
+datafield_name='latitude'
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+HDF_SD_GETDATA, sds_id, lat
+HDF_SD_ENDACCESS, sds_id
+
+; Read longitude.
+datafield_name='longitude'
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+HDF_SD_GETDATA, sds_id, lon
+HDF_SD_ENDACCESS, sds_id
+
+; Read hour index.
+datafield_name='gmt_hour_index'
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+HDF_SD_GETDATA, sds_id, ind
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name_ind
+
+HDF_SD_ENDACCESS, sds_id
+
+; Close file.
+HDF_SD_END, file_id_hdf
+
+; Convert data type.
+dataf=FLOAT(data[*,*,0])
+lon=FLOAT(lon)
+lat=FLOAT(lat)
+
+; Process fill value.
+idx=WHERE(data EQ fillvalue(0), cnt)
+if cnt gt 0 then dataf[idx]=!Values.F_NAN
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+tstr = STRTRIM(STRING(ind(0)), 1)
+title = long_name + ' at ' + long_name_ind + '=' + tstr
+t1 = TEXT(0.35, 0.01, title)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

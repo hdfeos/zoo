@@ -1,0 +1,164 @@
+;  This example code illustrates how to access and visualize LaRC MISR
+;  SOM TC CLOUD Grid file [1] in IDL.
+;
+;  If you have any questions, suggestions, comments on this example, please
+; use the HDF-EOS Forum (http: //hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Usage:
+;
+;  %idl MISR_AM1_TC_CLOUD_P005_O073792_F01_0001.hdf.idl
+;
+; Tested under: IDL 8.1
+; Last updated: 2021-09-02
+
+
+; Define file name,  grid name, and datafield.
+; The following file is downloaded form [2].
+file_name='MISR_AM1_TC_CLOUD_P005_O073792_F01_0001.hdf'
+grid_name='Stereo_WithoutWindCorrection_1.1_km'
+datafield_name='CloudTopHeight_WithoutWindCorrection'
+
+; Open file.
+file_id = EOS_GD_OPEN(file_name)
+
+; Retrieve data.
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+status = EOS_GD_READFIELD(grid_id, datafield_name, data3D)
+; Close file.
+status = EOS_GD_DETACH(grid_id)
+status = EOS_GD_CLOSE(file_id)
+
+; Open the file that has geo-location information.
+; The satellite path information in the file name should match.
+; For this example case, the "P005" must match.
+file_name_geo = 'MISR_AM1_AGP_P005_F01_24.hdf'
+grid_name_geo = 'Standard'
+file_id_geo = EOS_GD_OPEN(file_name_geo)
+grid_id_geo = EOS_GD_ATTACH(file_id_geo, grid_name_geo)
+
+; Retrieve lat & lon.
+status = EOS_GD_READFIELD(grid_id_geo, 'GeoLatitude', lat3D)
+status = EOS_GD_READFIELD(grid_id_geo, 'GeoLongitude', lon3D)
+
+; Close file.
+status = EOS_GD_DETACH(grid_id_geo)
+status = EOS_GD_CLOSE(file_id_geo)
+
+; Retrieve units, scale factor, and offset.
+newFileID=HDF_SD_START(file_name, /READ)
+index=HDF_SD_NAMETOINDEX(newFileID, datafield_name)
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+long_name_index=HDF_SD_ATTRFIND(thisSdsID, 'long_name')
+HDF_SD_ATTRINFO, thisSdsID, long_name_index, DATA=long_name
+fillvalue_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, fillvalue_index, DATA=fill_value
+HDF_SD_END, newFileID
+
+
+; To use !Values.F_NAN in IDL, change int16 type to float.
+data3Df = FLOAT(data3D)
+
+
+; According to data specification [1], there's no need to apply
+; scale / offset on this dataset.
+; 
+; Convert data that are equal to _FillValue to IDL NaN.
+idx=WHERE(data3D EQ fill_value(0), cnt)
+IF cnt GT 0 THEN data3Df[idx]=!Values.F_NAN
+
+
+dimsize = SIZE(data3D,/DIM)
+numlat = dimsize(0)
+numlon = dimsize(1)
+nblock = dimsize(2)
+
+; Convert the 3D data into 2D data for plotting.
+data=FINDGEN(numlat*nblock,numlon)
+
+FOR k=0,nblock-1 DO $
+  FOR i=0,numlat-1 DO $
+  FOR j=0, numlon-1 DO $
+  data(k*numlat+i,j)=data3Df(i,j,k)
+
+lat=FINDGEN(numlat*nblock,numlon)
+
+FOR k=0,nblock-1 DO $
+  FOR i=0,numlat-1 DO $
+  FOR j=0, numlon-1 DO $
+  lat(k*numlat+i,j)=lat3D(i,j,k)
+  
+lon=FINDGEN(numlat*nblock,numlon)
+
+FOR k=0,nblock-1 DO $
+  FOR i=0,numlat-1 DO $
+  FOR j=0, numlon-1 DO $
+  lon(k*numlat+i,j)=lon3D(i,j,k)
+  
+; The following coding is prepared for colorbar.
+; If you require colorbar in your plot, you could download
+; "Dr. Fanning's Coyote Library" from [4].
+;
+;  Make a directory named coyote somewhere on your machine, and
+;  extract the  Coyote files into it.
+; If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' ahead of coding.
+;
+; Add the coyote directory you create on your machine to your IDL path.
+;  !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+!PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; Generate the plot.
+levels=254
+DEVICE, DECOMPOSED=0
+LOADCT,33, NCOLORS=levels, BOTTOM=1
+WINDOW, Title=file_name +':' + datafield_name
+MAP_SET, /MERCATOR, /CONTINENTS, XMARGIN=5, YMARGIN=5,$
+  POSITION=[0.05, 0.05, 0.82, 0.84]
+CONTOUR, data, lon, lat, /OVERPLOT, /CELL_FILL, C_COLORS=Indgen(levels)+3, $
+  BACKGROUND=1, NLEVELS=levels, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+XYOUTS, 0.05, 0.87, /NORMAL, 'FIELD:' + long_name, $
+        CHARSIZE=1.25, COLOR=black, ALIGNMENT=0.0
+
+XYOUTS, 0.82, 0.87, /Normal, $
+  'UNIT:'+units, $
+  Charsize=1.25, Color=black, Alignment=1.0
+XYOUTS, 0.43, 0.92, /Normal, file_name, Charsize=1.75, Color=black, $
+  Alignment=0.5
+  
+; Get max and min value of data.
+idx=WHERE(data NE !Values.F_NAN, cnt)
+IF cnt GT 0 THEN datamin=FLOOR(MIN(data[idx], /NAN))
+IF cnt GT 0 THEN datamax=CEIL(MAX(data[idx], /NAN))
+
+;  The following coding is to generate color bar if you have already
+; downloaded and installed Dr. Fanning's Coyote Library and add the
+; coyote directory above. [4]
+;
+;  If you don't need color bar in your plot, you can ignore this step
+; and add comment character ';' at the beginning of the line.
+;
+COLORBAR, Range=[datamin, datamax], Ncolors=levels, /Vertical, $
+  Position=[0.9,0.1,0.94,0.9]
+
+; Write JPEG image file.
+im = TVRD(TRUE=3)
+jpg = file_name + '.idl.jpg'   
+WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+; EXIT
+
+
+; References
+;
+; [1] https://asdc.larc.nasa.gov/documents/misr/DPS_Cloud_V001.pdf
+; [2] ftp://l4ftl01.larc.nasa.gov/MISR/MIL2TCSP.001/2013.11.01/
+; [3] ftp://l4ftl01.larc.nasa.gov/MISR/MIANCAGP.001/1999.11.07/
+; [4] http://www.dfanning.com/documents/programs.html

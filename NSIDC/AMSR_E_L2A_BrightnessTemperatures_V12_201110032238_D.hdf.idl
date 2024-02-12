@@ -1,0 +1,92 @@
+;
+;  This example code illustrates how to access and visualize NSIDC
+;  AMSR_E L2A HDF-EOS2 Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Usage:
+;
+;  $idl AMSR_E_L2A_BrightnessTemperatures_V12_201110032238_D.hdf.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2018-09-21
+
+; Define file name, swath name, and data field.
+file_name='AMSR_E_L2A_BrightnessTemperatures_V12_201110032238_D.hdf'
+swath_name='High_Res_B_Swath'
+datafield_name='89.0V_Res.5B_TB_(not-resampled)'
+
+; Open file.
+file_id=EOS_SW_OPEN(file_name)
+
+; Attach Swath.
+swath_id=EOS_SW_ATTACH(file_id, swath_name)
+
+; Retrieve data.
+status=EOS_SW_READFIELD(swath_id,datafield_name,data)
+
+; Retrieve lat/lon.
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+
+; Detach Swath.
+status=EOS_SW_DETACH(swath_id)
+
+; Close file.
+status=EOS_SW_CLOSE(file_id)
+
+; Retrieve units, scale factor, and offset.
+newFileID=HDF_SD_START(file_name, /READ)
+index=HDF_SD_NAMETOINDEX(newFileID, datafield_name)
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'UNIT')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+scalefactor_index=HDF_SD_ATTRFIND(thisSdsID, 'SCALE FACTOR')
+HDF_SD_ATTRINFO, thisSdsID, scalefactor_index, DATA=scale_factor
+offset_index=HDF_SD_ATTRFIND(thisSdsID, 'OFFSET')
+HDF_SD_ATTRINFO, thisSdsID, offset_index, DATA=offset
+HDF_SD_END, newFileID
+
+; Read fillvalue directly from data. There is no fill value attribute.
+fillvalue=-32768
+
+; Convert data type.
+dataf=float(data)
+
+; Process fill value.
+dataf[WHERE(data EQ fillvalue)] = !Values.F_NAN
+
+; Apply scale factor and offset.
+dataf=offset(0)+(scale_factor(0))*dataf
+
+; Get max and min value of data.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+
+t1 = TEXT(0.35, 0.01, datafield_name)
+; c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+;c1 = CONTOUR(dataf, lon, lat, OVERPLOT=m, $
+;             RGB_TABLE=ct, $
+;             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+c1 = SCATTERPLOT(lon[*], lat[*], OVERPLOT=m, $
+                 MAGNITUDE = dataf[*], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+
+

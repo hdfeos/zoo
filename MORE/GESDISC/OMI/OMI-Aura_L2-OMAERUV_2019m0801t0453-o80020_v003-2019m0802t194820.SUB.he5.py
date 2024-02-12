@@ -1,5 +1,4 @@
 """
-Copyright (C) 2020 The HDF Group
 
 This example code illustrates how to convert a GES DISC OMI L2 file to GeoTIFF
 in Python.

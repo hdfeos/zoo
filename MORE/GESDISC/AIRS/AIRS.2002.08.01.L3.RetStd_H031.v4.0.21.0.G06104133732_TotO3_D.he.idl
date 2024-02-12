@@ -1,0 +1,74 @@
+;This example code illustrates how to access and visualize GESDISC_AIRS Grid in IDL. 
+;If you have any questions, suggestions, comments  on this example, please use the HDF-EOS Forum (http://hdfeos.org/forums). 
+;If you would like to see an  example of any other NASA HDF/HDF-EOS data product that is not listed in the HDF-EOS Comprehensive Examples page (http://hdfeos.org/zoo), 
+;feel free to contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Refer to: AIRS.2002.08.01.L3.RetStd_H031.v4.0.21.0.G06104133732.hdf
+; DataField name: TotO3_D
+
+; IDL example for reading AIRS L3 Grid.
+; Open file
+FILE_NAME='AIRS.2002.08.01.L3.RetStd_H031.v4.0.21.0.G06104133732.hdf'
+file_id = EOS_GD_OPEN(FILE_NAME)
+
+; Define grid name and datafield
+GRID_NAME='descending'
+DATAFIELD_NAME='TotO3_D'
+
+; Retrieve data
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, data)
+
+;get fillvalue
+status=EOS_GD_GETFILLVALUE(grid_id, DATAFIELD_NAME, fillvalue)
+
+status = EOS_GD_DETACH(grid_id)
+
+; Retrieve lat/lon
+GRID_NAME='location'
+DATAFIELD_NAME='Longitude'
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, lon)
+status = EOS_GD_DETACH(grid_id)
+
+GRID_NAME='location'
+DATAFIELD_NAME='Latitude'
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, lat)
+status = EOS_GD_DETACH(grid_id)
+status = EOS_GD_CLOSE(file_id)
+
+; Convert data type
+data=float(data)
+fillvalue=float(fillvalue(0))
+
+;get max and min value of data
+idx=where(data ne fillvalue(0), cnt)
+if cnt gt 0 then datamin=min(data[idx])
+if cnt gt 0 then datamax=max(data[idx])
+
+;Process fill values, convert data that are equal to fillvalue to NaN
+idx=where(data eq fillvalue, cnt)
+if cnt gt 0 then data[idx] = !Values.F_NAN
+
+;The following coding is prepared for colorbar. 
+;If you require colorbar in your plot, you could download Dr. Fanning's Coyote Library from (http://www.dfanning.com/documents/programs.html). 
+;Make a directory named coyote somewhere on your machine, and extract the Coyote files into it. 
+;If color bar is not not necessary for your plot, you can ignore this step and add comment character ';' ahead of coding. 
+;Add the coyote directory you create on your machine to your IDL path. !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+!PATH=Expand_Path('+/mnt/hdf/ziying-li/coyote/')+':'+!PATH
+
+
+; Start off generating the plot
+levels = 254
+device, decomposed=0
+LoadCT, 33, Ncolors=levels, Bottom=1
+WINDOW, Title='TotO3_D'+'  '+'units:', XSIZE=800
+MAP_SET, /GRID, /CONTINENTS, POSITION=[0.05, 0.05, 0.82, 0.95], XMARGIN=5, YMARGIN=5
+CONTOUR, BYTSCL(data, /NAN), lon, lat, /OVERPLOT, /FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+;The following coding is to generate color bar if your already download and install Dr. Fanning's Coyote Library and add the coyote directory above. 
+;If you don't need color bar in your plot, you can ignore this step and add comment character ';' ahead of coding.
+COLORBAR, Range=[datamin,datamax], Ncolors=levels, /Vertical, Position=[0.9,0.1,0.94,0.9]
+

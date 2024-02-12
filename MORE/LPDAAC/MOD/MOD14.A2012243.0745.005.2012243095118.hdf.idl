@@ -1,0 +1,171 @@
+;
+;  This example code illustrates how to access and visualize LAADS
+;  MOD14 Swath HDF4 file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Tested under: IDL 8.0
+; Last updated: 2013-1-11
+
+
+; Define file name and data field.
+file_name='MOD14.A2012243.0745.005.2012243095118.hdf'
+datafield_name='fire mask'
+
+
+; Retrieve legend and valid_range attributes. 
+file_id_hdf=HDF_SD_START(file_name, /READ)
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+HDF_SD_GETDATA, sds_id, data
+
+legend_index=HDF_SD_ATTRFIND(sds_id, 'legend')
+HDF_SD_ATTRINFO, sds_id, legend_index, DATA=legend
+PRINT, legend
+valid_range_index=HDF_SD_ATTRFIND(sds_id, 'valid_range')
+HDF_SD_ATTRINFO, sds_id, valid_range_index, data=valid_range
+
+
+HDF_SD_ENDACCESS, sds_id
+HDF_SD_END, file_id_hdf
+
+
+; Since dimension maps are used in the MOD14 file, we must use
+; geolocation values that are stored in a secondary file.
+; 
+; You can find the name of dimension map file from the "MOD03 input
+; file" HDF4 file attribute. You can check its value with HDFView
+; easily.
+; 
+; The "A2012243.0745.005" part of each file name should match.
+file_name_geo='MOD03.A2012243.0745.005.2012243133832.hdf'
+swath_name= 'MODIS_Swath_Type_GEO'
+file_id = EOS_SW_OPEN(file_name_geo)
+swath_id=EOS_SW_ATTACH(file_id, swath_name)
+
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+
+status=EOS_SW_DETACH(swath_id)
+status=EOS_SW_CLOSE(file_id)
+
+; Convert data type.
+dataf=float(data)
+
+; Process valid_range.
+idx=WHERE(data LT valid_range(0) OR data GT valid_range(1), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+;  The following key information for color table is obtained from the
+; data field's "legend" attribute. You can check it using HDFView
+; or using 'PRINT, legend' IDL command.
+;
+;0 missing input data
+;1 not processed (obsolete)
+;2 not processed (obsolete)
+;3 water
+;4 cloud
+;5 non-fire
+;6 unknown
+;7 fire (low confidence)
+;8 fire (nominal confidence)
+;9 fire (high confidence)
+
+; Key:  bg,0,   1,      2,   3,   4 ,  5,   6,   7,   8,    9
+red =  [0, 0,  50,    100,   0, 255,   0,  63, 100, 200, 255]
+green= [0, 0,  50,    100,   0, 255, 255,   0,   0,   0,   0]
+blue=  [0, 0,  50,    100, 255, 255,   0,  63,   0,   0,   0]
+C_levels=[0, 1, 2, 3, 4, 5, 6, 7,  8, 9]
+levels = 10
+
+; Generate the plot.
+DEVICE, DECOMPOSED=0
+; Load the custom color table.
+TVLCT, red, green, blue
+
+WINDOW, Title=file_name
+
+; Limit the plot to the Northern Hemisphere.
+;
+; To get a zoomed effect, MAP_SET LIMIT option the lat min to +30
+; latmin=30
+latmin = MIN(lat, /NAN)
+;latmax=90
+latmax = MAX(lat, /NAN)
+lonmin = MIN(lon, /NAN)
+;lonmin=-180
+;lonmax=180
+lonmax = MAX(lon, /NAN)
+
+; We plot using LAMBERT Azimuthal Projection with origin at the North
+; pole (+90 lat) to get a better view of this swath.
+; The /ISOTROPIC option makes the plot square.
+MAP_SET, /LAMBERT, 90, 0, 0, /ISOTROPIC, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+ POSITION=[0.05, 0.05, 0.82, 0.82], LIMIT=[latmin, lonmin, latmax, lonmax]
+; Generate the filled contour plot
+CONTOUR, data, lon, lat, /OVERPLOT, /CELL_FILL, LEVELS=C_levels, $
+  C_Colors=Indgen(levels)+1
+
+; Don't use /BOX_GRID option for polar view.
+MAP_GRID, /LABEL
+MAP_CONTINENTS
+XYOuts, 0.35, 0.84, /Normal, DATAFIELD_NAME, $
+  Charsize=1.25, Alignment=0.0
+XYOuts, 0.5, 0.92, /Normal, FILE_NAME, $
+  Charsize=1.75,  Alignment=0.5
+
+;  The following code is prepared for colorbar.
+;
+;   If you require colorbar in your plot, you could download
+; "Dr. Fanning's Coyote Library" from reference [4], below.
+; Make a directory named coyote somewhere on your machine,
+; and extract the Coyote files into it.
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' ahead of coding.
+;
+;    Add the coyote directory you create on your machine to your IDL
+;  path like below:
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; Let's assume that you've installed coyote library under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+; The following key information in "C_labels" variable is obtained from the
+; data field's "legend" attribute.
+;
+; You can check it using HDFView.
+C_labels=['missing', 'obsolete', 'obsolete',$
+          'water', 'cloud', 'non-fire',$
+          'unknown', 'fire(low)', 'fire(normal)',$
+          'fire(high)']
+
+; Plot the discrete color bar.
+DCBAR, NCOLORS=levels, BOTTOM=1,  /Vertical, LABELS=C_labels, $
+  Position=[0.8,0.1,0.82,0.8]
+
+
+; Write JPEG image file.
+im = TVRD(TRUE=3)
+jpg = file_name + '.idl.jpg'
+WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+exit
+
+; Reference
+;
+; [1] http://ladsweb.nascom.nasa.gov/filespecs/MOD05_L2.CDL.fs
+; [2] http://www.dfanning.com/documents/programs.html
+
+

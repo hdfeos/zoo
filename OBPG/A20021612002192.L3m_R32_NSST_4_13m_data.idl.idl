@@ -1,0 +1,136 @@
+; This example code illustrates how to access and visualize OBPG_MODISA HDF4 file in IDL. 
+; If you have any questions, suggestions, comments on this example, please use the HDF-EOS Forum (http://hdfeos.org/forums). 
+; If you would like to see an  example of any other NASA HDF/HDF-EOS data product that is not listed in the HDF-EOS 
+; Comprehensive Examples page (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or post it at the 
+; HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Refer to: A20021612002192.L3m_R32_NSST_4.hdf
+; DataField name: l3m_data
+
+; IDL example for reading OBPG MODISA L3m HDF4 file
+; Open file
+  file_name='A20021612002192.L3m_R32_NSST_4.hdf'
+  newFileID=HDF_SD_START(file_name, /READ)
+
+; get vector point for lat and lon
+  index=HDF_SD_ATTRFIND(newFileID, 'SW Point Latitude')
+  HDF_SD_ATTRINFO, newFileID, index, NAME=n, TYPE=t, COUNT=c, DATA=veclat, HDF_TYPE=h
+
+  index=HDF_SD_ATTRFIND(newFileID, 'SW Point Longitude')
+  HDF_SD_ATTRINFO, newFileID, index, DATA=veclon
+
+; get vector point for Latitude Step and Longitude Step
+  index=HDF_SD_ATTRFIND(newFileID, 'Latitude Step')
+  HDF_SD_ATTRINFO, newFileID, index, DATA=latstep
+
+  index=HDF_SD_ATTRFIND(newFileID, 'Longitude Step')
+  HDF_SD_ATTRINFO, newFileID, index, DATA=lonstep
+
+; Define data field
+  datafield_name="l3m_data"
+  index=HDF_SD_NAMETOINDEX(newFileID,datafield_name)
+
+; Retrieve data
+  thisSdsID=HDF_SD_SELECT(newFileID, index)
+  HDF_SD_GETDATA, thisSdsID, data
+
+; Read slope and intercept
+  index=HDF_SD_ATTRFIND(thisSdsID, 'Slope')
+  HDF_SD_ATTRINFO, thisSdsID, index, DATA=slope
+
+  index=HDF_SD_ATTRFIND(thisSdsID, 'Intercept')
+  HDF_SD_ATTRINFO, thisSdsID, index, DATA=intercept
+
+; Close file
+  HDF_SD_END, newFileID
+
+; Calculate the latitude and longitude range based on vector points and lat/lon step
+  lat=FINDGEN(4320)*latstep(0)+veclat(0)
+  lon=FINDGEN(8640)*lonstep(0)+veclon(0)
+
+; Reverse lat
+  lat=reverse(lat)
+
+; read fillvalue from data
+  fillvalue = 65535.00
+
+; Convert data type
+  dataf=float(data)
+  fillvaluef = float(fillvalue)
+
+; data transformation
+  dataf=(slope(0)*dataf)+intercept(0)
+  fillvaluef=intercept(0)+(slope(0))*fillvaluef
+
+; Process fill values, convert data that are equal to fillvalue to NaN
+  idx=where(dataf eq fillvaluef(0), cnt)
+
+; Process valid_range.
+  idx=WHERE(dataf LT valid_range(0) OR dataf GT valid_range(1), cnt)
+  IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Get max and min value of data for color bar.
+  datamin = MIN(dataf, /NAN)
+  datamax = MAX(dataf, /NAN)
+
+; The following coding is prepared for colorbar. If you require colorbar in your plot, you could download Dr. 
+; Fan's Coyote Library from (http://www.dfanning.com/documents/programs.html). Make a directory named coyote 
+; somewhere on your machine, and extract the Coyote files into it. If color bar is not not necessary for your
+; plot, you can ignore this step and add comment character ';' ahead of coding. 
+; Add the coyote directory you create on your machine to your IDL path. 
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+  !PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; Start off generating the plot
+  levels=254
+  device,decomposed=0
+  LoadCT,33, Ncolors=levels, Bottom=1
+  WINDOW, Title='FIELD:13m_data' + '  ' + 'UNIT:deg-C', XSIZE=800, YSIZE=500
+  MAP_SET, /Grid, /CONTINENTS, XMARGIN=5, YMARGIN=5, POSITION=[0.05, 0.05, 0.81, 0.82], /NOERASE
+  CONTOUR, dataf, lon, lat, /OVERPLOT, /Cell_FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+  MAP_GRID, /BOX_AXES, COLOR=255
+  MAP_CONTINENTS, COLOR=255
+
+; Draw file name, field name, and unit.
+  XYOUTS, 0.05, 0.87, /NORMAL, 'FIELD:13m_data', $
+    CHARSIZE=1.25,  ALIGNMENT=0.0
+  XYOUTS, 0.94, 0.87, /NORMAL, 'UNIT:deg-C', $ 
+    CHARSIZE=1.25,  ALIGNMENT=1.0
+  XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+    CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+; If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [1]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+; If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+; Add the coyote directory that you created on your machine to your IDL
+; path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; We assume that the coyote library is installed under the current working
+; directory that this code exists.
+  !PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+; If you don't need a color bar in your plot, you can ignore this step
+; by adding comment character ';' at the beginning of the code.
+  COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+    Position=[0.9,0.05,0.94,0.82]
+
+; Write JPEG image file.
+  im = TVRD(TRUE=3)
+  jpg = 'A20021612002192.L3m_R32_NSST_4_13m_data.idl.JPG'   
+  WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; Reference
+;
+; [1] http://www.dfanning.com/documents/programs.html

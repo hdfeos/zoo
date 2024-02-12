@@ -1,0 +1,118 @@
+;This example code illustrates how to access and visualize LaRC_MISR Grid file
+; in IDL. 
+;If you have any questions, suggestions, comments on this example, please use
+; the HDF-EOS Forum (http://hdfeos.org/forums). 
+;If you would like to see an  example of any other NASA HDF/HDF-EOS data
+; product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), 
+;feel free to contact us at eoshelp@hdfgroup.org or post it at the
+; HDF-EOS Forum (http://hdfeos.org/forums).
+
+FILE_NAME='MISR_AM1_GRP_ELLIPSOID_GM_P117_O058421_BA_F03_0024.hdf'
+file_id = EOS_GD_OPEN(FILE_NAME)
+
+;define grid name and datafield
+; file contains: GRIDs BlueBand, GreenBand, RedBand, NIRBand
+GRID_NAME='NIRBand'
+;  file contains: DATA FIELDs  Blue, Green, Red, NIR Radiance/RDQI
+DATAFIELD_NAME='NIR Radiance/RDQI'
+;  FIELDINFO dims: SOMBlockDim 180, XDim 128, YDim 512
+
+; Retrieve data
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, data)
+
+; Convert the M-D data to 2D data at SOMBlockDim=50
+data=data(*,*,50)
+data=reform(data)
+
+; Close file
+status = EOS_GD_DETACH(grid_id)
+status = EOS_GD_CLOSE(file_id)
+
+;retrieve fillvalue
+FILE_NAME='MISR_AM1_GRP_ELLIPSOID_GM_P117_O058421_BA_F03_0024.hdf'
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+DATAFIELD_NAME='NIR Radiance/RDQI'
+index=HDF_SD_NAMETOINDEX(newFileID,DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+Fillvalue_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, Fillvalue_index, data=fillvalue
+
+HDF_SD_END, newFileID
+
+;convert data type
+data=float(data)
+fillvalue=float(fillvalue)
+
+;get max and min value of data
+idx=where(data ne fillvalue(0), cnt)
+if cnt gt 0 then datamin=min(data[idx])
+if cnt gt 0 then datamax=max(data[idx])
+
+; Process fillvalue, convert data that are equal to fillvalue to NaN
+idx=where(data eq fillvalue(0),cnt)
+if cnt gt 0 then data[idx]=!Values.F_NAN
+
+; The geolocation values are stored in a secondary file.
+; Retrieve dimension size of datadimsize=size(data,/dim)
+dimsize=size(data,/dim)
+numlat=dimsize(0)
+numlon=dimsize(1)
+
+openr,1,'lat_MISR_ELLIPSOID_P117_F03_lvl50.output'
+size=numlat*numlon
+ValInlat=FltArr(size)
+READF,1,ValInlat
+
+lat=FINDGEN(numlat,numlon)
+lat=Reform(ValInlat,numlat,numlon)
+
+openr,2,'lon_MISR_ELLIPSOID_P117_F03_lvl50.output'
+size=numlat*numlon
+ValInlon=FltArr(size)
+READF,2,ValInlon
+
+lon=FINDGEN(numlat,numlon)
+lon=Reform(ValInlon,numlat,numlon)
+
+;The following coding is prepared for colorbar.
+; If you require colorbar in your plot, you could download Dr. Fanning's
+; Coyote Library from (http://www.dfanning.com/documents/programs.html).
+; Make a directory named coyote somewhere on your machine, and extract the
+; Coyote files into it. If color bar is not not necessary for your plot, you
+; can ignore this step and add comment character ';' ahead of coding. 
+;Add the coyote directory you create on your machine to your IDL path.
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+!PATH=Expand_Path('+/mnt/hdf/ziying-li/coyote/')+':'+!PATH
+
+
+; Start off generating the plot
+levels=254
+device,decomposed=0
+LoadCT,33, Ncolors=levels, Bottom=1
+WINDOW, Title='MISR_AM1_GRP_ELLIPSOID_GM_P117_O058421_BA_F03_0024_NIR_Radiance at SOMBlockDim=50'
+MAP_SET, /MERCATOR, /CONTINENTS, XMARGIN=5, YMARGIN=5, POSITION=[0.05, 0.05, 0.82, 0.84]
+CONTOUR, data, lon, lat, /OVERPLOT, /Cell_FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+XYOuts, 0.05, 0.87, /Normal, 'NIR Radiance SOMBlockDim=50', Charsize=1.25, color=black, Alignment=0.0
+XYOuts, 0.82, 0.87, /Normal, 'units:', Charsize=1.25, Color=black, Alignment=1.0
+XYOuts, 0.43, 0.92, /Normal, file_name, Charsize=1.75, Color=black, Alignment=0.5
+
+;The following coding is to generate color bar if your already download and
+; install Dr. Fanning's Coyote Library and add the coyote directory above. 
+;If you don't need color bar in your plot, you can ignore this step and add
+; comment character ';' ahead of coding.
+;Because of the limitation of this routine, the color bar can not display
+; properly in this case.
+COLORBAR, Range=[datamin, datamax], Ncolors=levels, /Vertical, Position=[0.9,0.1,0.94,0.9]
+
+
+
+
+
+

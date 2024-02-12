@@ -1,0 +1,178 @@
+;  This example code illustrates how to access and visualize GES-DISC HIRDLS
+;  Zonal Average HDF-EOS5 file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Tested under: IDL 8.0
+; Last updated: 2011-11-09
+
+; Open file.
+file_name='HIRDLS-Aura_L3ZAD_v06-00-00-c02_2005d022-2008d077.he5'
+file_id=H5F_OPEN(file_name)
+
+; Read data.
+datafield_name='/HDFEOS/ZAS/HIRDLS/Data Fields/NO2Day'
+data_id=H5D_OPEN(file_id,datafield_name)
+data=H5D_READ(data_id)
+
+; Get title.
+title_id=H5A_OPEN_NAME(data_id, 'Title')
+title=H5A_READ(title_id)
+H5A_Close, title_id
+
+; Get units.
+units_id=H5A_OPEN_NAME(data_id, 'Units')
+units=H5A_READ(units_id)
+H5A_Close, units_id
+
+; Get missing value.
+missingvalue_id=H5A_OPEN_NAME(data_id,'MissingValue')
+missingvalue=H5A_READ(missingvalue_id)
+H5A_Close, missingvalue_id
+
+; Get fill value.
+fillvalue_id=H5A_OPEN_NAME(data_id,'_FillValue')
+fillvalue=H5A_READ(fillvalue_id)
+H5A_Close, fillvalue_id
+
+; Close dataset.
+H5D_Close, data_id
+
+; Read latitude.
+latitude_name='/HDFEOS/ZAS/HIRDLS/Data Fields/Latitude'
+latitude_id=H5D_OPEN(file_id, latitude_name)
+lat=H5D_READ(latitude_id)
+
+; Get title.
+title_id=H5A_OPEN_NAME(latitude_id, 'Title')
+title_lat=H5A_READ(title_id)
+H5A_Close, title_id
+
+; Get units.
+units_id=H5A_OPEN_NAME(latitude_id, 'Units')
+units_lat=H5A_READ(units_id)
+H5A_Close, units_id
+
+; Close dataset.
+H5D_Close, latitude_id
+
+; Read Pressure.
+pressure_name='/HDFEOS/ZAS/HIRDLS/Data Fields/Pressure'
+pressure_id=H5D_OPEN(file_id, pressure_name)
+pressure=H5D_READ(pressure_id)
+
+; Get title.
+title_id=H5A_OPEN_NAME(pressure_id, 'Title')
+title_pressure=H5A_READ(title_id)
+H5A_Close, title_id
+
+; Get units.
+units_id=H5A_OPEN_NAME(pressure_id, 'Units')
+units_pressure=H5A_READ(units_id)
+H5A_Close, units_id
+
+; Close dataset.
+H5D_Close, pressure_id
+
+; Read Time.
+Time_name='/HDFEOS/ZAS/HIRDLS/Data Fields/Time'
+time_id=H5D_OPEN(file_id,Time_name)
+time=H5D_READ(time_id)
+H5D_Close, time_id
+
+; Close file.
+H5F_Close, file_id
+
+; Convert type to double.
+dataf = float(data)
+
+; Process missing value.
+idx=where(data eq missingvalue(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+; Process fill value.
+idx=where(data eq fillvalue(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+; Set subset index.
+tdim = 0
+
+; Subset data.
+data2D=dataf(*,*,tdim)
+data2D=data2D * 1000000000
+time_at = time(tdim)
+
+; Apply log scale on Pressure to get a better image.
+pressure = ALOG10(pressure)
+
+; Time's unit is TAI-93.
+start_time = JULDAY(1,1,1993, 0, 0, 0)
+sec = time_at / 86400
+t = start_time + sec
+CALDAT, t, Mo, D, Y, H, Mi, S
+tstring = STRING(Y, FORMAT='(I4)') + '-' + STRING(Mo, FORMAT='(I2.2)') + $
+          '-' + STRING(D, FORMAT='(I2.2)') + ' ' + STRING(H, FORMAT='(I2.2)') $ 
+          + ':' + STRING(Mi, FORMAT='(I2.2)') + ':' + STRING(S, FORMAT='(I2.2)')  
+;   The following code is prepared for colorbar. 
+;
+;   If you require colorbar in your plot, you could download 
+; "Dr. Fanning's Coyote Library" from [1]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' ahead of coding. 
+;
+;    Add the coyote directory you create on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; Let's assume that you've installed coyote library under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+; Generate the plot.
+LEVELS = 200
+DEVICE, DECOMPOSED=0
+LoadCT, 33, NCOLORS=levels, BOTTOM=3
+WINDOW,Title=file_name, XSIZE=800
+CONTOUR, data2D, lat, pressure, /CELL_FILL, $
+         C_Colors=Indgen(levels)+3, $
+         Background=1, NLEVELS=levels, Color=Black, $
+         XTITLE=title_lat +' (' + units_lat + ')', $
+         YTITLE=title_pressure + ' (' + units_pressure + ') in log10 scale', $
+         POSITION=[0.1, 0.1, 0.82, 0.8]
+
+XYOuts, 0.1, 0.82, /Normal, 'FIELD:' + title $
+  +' at ' + tstring, $
+ Charsize=1.25, color=black, Alignment=0.0
+XYOuts, 0.82, 0.82, /Normal, 'UNIT:' + units + 'x10!E-9', $ 
+  Charsize=1.25, Color=black, Alignment=1.0
+XYOuts, 0.43, 0.92, /Normal, file_name, $
+  Charsize=1.75, Color=black, Alignment=0.5
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+datamin=MIN(data2D, /NAN)
+datamax=MAX(data2D, /NAN)
+COLORBAR, Range=[datamin,datamax], Ncolors=levels, /Vertical, $
+ Position=[0.9,0.1,0.94,0.8], FORMAT='(F5.2)'
+
+; Write JPEG image file.
+  im = TVRD(TRUE=3)
+  jpg = file_name + '.idl.jpg'   
+  WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; References
+;
+; [1] http://www.dfanning.com/documents/programs.html

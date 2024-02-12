@@ -1,0 +1,112 @@
+;This example code illustrates how to access and visualize LaRC_GOMACCS Grid file in IDL. 
+;If you have any questions, suggestions, comments on this example, please use the HDF-EOS Forum (http://hdfeos.org/forums). 
+;If you would like to see an  example of any other NASA HDF/HDF-EOS data product that is not listed in the HDF-EOS Comprehensive Examples page (http://hdfeos.org/zoo), 
+;feel free to contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Refer to: MISR_ELLIPSOID_GM_P017_O036105_DF_F03_0024_GOM_b64-72.hdf
+; DataField name:Blue Radiance/RDQI
+
+; IDL example for reading LaRC_GOMACCS Grid file ---- SOM projection
+; Open file
+FILE_NAME='MISR_ELLIPSOID_GM_P017_O036105_DF_F03_0024_GOM_b64-72.hdf'
+file_id = EOS_GD_OPEN(FILE_NAME)
+
+;define grid name and datafield
+GRID_NAME='BlueBand'
+DATAFIELD_NAME='Blue Radiance/RDQI'
+
+; Retrieve data
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, data)
+
+; Convert the M-D data to 2D data at SOMBlockDim=65
+data=data(*,*,65)
+data=reform(data)
+
+; Close file
+status = EOS_GD_DETACH(grid_id)
+status = EOS_GD_CLOSE(file_id)
+
+;retrieve fillvalue
+FILE_NAME='MISR_ELLIPSOID_GM_P017_O036105_DF_F03_0024_GOM_b64-72.hdf'
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+DATAFIELD_NAME='Blue Radiance/RDQI'
+index=HDF_SD_NAMETOINDEX(newFileID,DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+Fillvalue_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, Fillvalue_index, data=fillvalue
+
+HDF_SD_END, newFileID
+
+;convert data type
+data=float(data)
+fillvalue=float(fillvalue)
+
+;get max and min value of data
+idx=where(data ne fillvalue(0), cnt)
+if cnt gt 0 then datamin=min(data[idx])
+if cnt gt 0 then datamax=max(data[idx])
+
+; Process fillvalue, convert data that are equal to fillvalue to NaN
+idx=where(data eq fillvalue(0),cnt)
+if cnt gt 0 then data[idx]=!Values.F_NAN
+
+;retrieve dimension size of data
+dimsize=size(data,/dim)
+numlat=dimsize(0)
+numlon=dimsize(1)
+
+; The file contains SOM projection. We need to use eosdump to generate 1D lat and lon
+; For information on how to obtain the lat/lon data, check this URL http://hdfeos.org/zoo/note_non_geographic.php
+
+; Retrieve dimension size of data
+openr,1,'lat_MISR_ELLIPSOID_GM_P017_O036105_DF_F03_0024_GOM_b64-72.output'
+size=numlat*numlon
+ValInlat=FltArr(size)
+READF,1,ValInlat
+
+lat=FINDGEN(numlat,numlon)
+lat=Reform(ValInlat,numlat,numlon)
+
+openr,2,'lon_MISR_ELLIPSOID_GM_P017_O036105_DF_F03_0024_GOM_b64-72.output'
+ValInlon=FltArr(size)
+READF,2,ValInlon
+
+lon=FINDGEN(numlat,numlon)
+lon=Reform(ValInlon,numlat,numlon)
+
+
+;Get vertex value for lat and lon
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+;The following coding is prepared for colorbar. 
+;If you require colorbar in your plot, you could download Dr. Fanning's Coyote Library from (http://www.dfanning.com/documents/programs.html). 
+;Make a directory named coyote somewhere on your machine, and extract the Coyote files into it. 
+;If color bar is not not necessary for your plot, you can ignore this step and add comment character ';' ahead of coding. 
+;Add the coyote directory you create on your machine to your IDL path. !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+!PATH=Expand_Path('+/mnt/hdf/ziying-li/coyote/')+':'+!PATH
+
+; Start off generating the plot
+levels=254
+device,decomposed=0
+LoadCT,33, Ncolors=levels, Bottom=1
+WINDOW, Title='Blue Radiance/RDQI at SOMBlockDim=65'+'  '+'units:'
+MAP_SET, /MERCATOR, /CONTINENTS, XMARGIN=5, YMARGIN=5, POSITION=[0.05, 0.05, 0.82, 0.95], LIMIT=[latmin, lonmin, latmax, lonmax]
+CONTOUR, data, lon, lat, /OVERPLOT, /FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+;The following coding is to generate color bar if your already download and install Dr. Fanning's Coyote Library and add the coyote directory above. 
+;If you don't need color bar in your plot, you can ignore this step and add comment character ';' ahead of coding.
+COLORBAR, Range=[datamin, datamax], Ncolors=levels, /Vertical, Position=[0.9,0.1,0.94,0.9]
+
+
+
+
+
+

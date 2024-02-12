@@ -1,0 +1,97 @@
+;
+; This example code illustrates how to access and visualize LP DAAC ASTER
+; GED (AG100) v3 HDF5 file in IDL. 
+;
+;  If you have any questions, suggestions, comments on this example, please 
+; use the HDF-EOS Forum (http://hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or 
+; post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+; $idl AG100.v003.64.-089.0001.h5.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2018-05-09
+
+; Open file.
+file_name='AG100.v003.64.-089.0001.h5';
+file_id=H5F_OPEN(file_name)
+
+; Read data.
+datafield_name='/Emissivity/Mean'
+data_id=H5D_OPEN(file_id,datafield_name)
+data=H5D_READ(data_id)
+
+; Read attribute.
+description_id=H5A_OPEN_NAME(data_id, 'Description')
+description=H5A_READ(description_id)
+H5A_CLOSE, description_id
+
+; Close dataset.
+H5D_CLOSE, data_id
+
+; Read latitude.
+latitude_name='/Geolocation/Latitude'
+latitude_id=H5D_OPEN(file_id, latitude_name)
+lat=H5D_READ(latitude_id)
+
+; Close dataset.
+H5D_CLOSE, latitude_id
+
+; Read longitude.
+lon_name='/Geolocation/Longitude'
+lon_id=H5D_OPEN(file_id, lon_name)
+lon=H5D_READ(lon_id)
+
+; Close dataset.
+H5D_CLOSE, lon_id
+
+; Subset data.
+data = data(*,*,1)
+
+; Convert data type.
+dataf=FLOAT(data)
+
+; Process fillvalue.
+idx=WHERE(data EQ -9999, cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Apply scale factor [1].
+dataf = dataf * 0.001
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; Get min/max value for lat and lon for zoomed image.
+latmin=MIN(lat)
+latmax=MAX(lat)
+lonmin=MIN(lon)
+lonmax=MAX(lon)
+
+; Annotate plot.
+long_name = "Mean Emissivity for Band 10"
+units = "None"
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER, $
+        LIMIT=[latmin, lonmin, latmax, lonmax])
+ct = COLORTABLE(72, /reverse)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, description+' (Band 10)')
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, $
+              TEXTPOS=1, POSITION=[0.85,0.3,0.87,0.7], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, WIDTH=800, HEIGHT=600
+EXIT
+; References
+;
+; [1] https://lpdaac.usgs.gov/products/community_products_table/agns100
+

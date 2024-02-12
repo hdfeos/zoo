@@ -1,0 +1,128 @@
+;
+;  This example code illustrates how to access and visualize LaRC
+;  CERES ES9 NPP HDF4 file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl CER_ES9_NPP-FM5_Edition2_202209.201909.hdf.idl
+;
+; Tested under: IDL 8.8.3
+; Last updated: 2022-12-06
+
+file_name = 'CER_ES9_NPP-FM5_Edition2_202209.201909.hdf'
+
+; NOTE: This product has SDS datasets with the same name under
+; different groups. Therefore, HDF4 SD interface alone will not work
+; to process some SDS datasets. See [1] for Vgroup interfaces.
+fid = HDF_OPEN(file_name, /read)
+
+; Find all VGroups. 
+x = HDF_VG_LONE(fid)
+n = SIZE(x, /N_ELEMENTS)
+
+; Array of VGroup IDs
+v = MAKE_ARRAY(n, /LONG, VALUE = 0)
+
+; Collect VGroup IDs.
+j = 0
+FOREACH i, x DO v[j++] = HDF_VG_ATTACH(fid, i, /READ) 
+
+; We want to plot data from "Hourbox Data" group.
+lp = LAMBDAP('vid,l: HDF_VG_GETINFO, vid, CLASS=c, NAME=nm, NENTRIES=n & IF nm EQ "Hourbox Data" THEN l = vid')
+FOREACH vid, v DO lp, vid, l
+HDF_VG_GETTRS, l, tags, refs
+
+; All tags are 720, which means HDF4 scientific data set (SDS).
+; PRINT, tags
+
+sd_id = HDF_SD_START(file_name, /READ)
+
+; Search "Longwave flux" dataset under the "Hourbox Data" group.
+lp_dset = LAMBDAP('s,r,id: i = HDF_SD_REFTOINDEX(s, r) & sid = HDF_SD_SELECT(s, i) & HDF_SD_GETINFO, sid, NAME=nm & IF nm EQ "Longwave flux" THEN id = sid')
+FOREACH r, refs DO lp_dset, sd_id, r, sds_id
+
+HDF_SD_GETDATA, sds_id, data
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+HDF_SD_ENDACCESS, sds_id
+
+; Search "Colatitude" dataset under the "Hourbox Data" group.
+lp_colat = LAMBDAP('s,r,id: i = HDF_SD_REFTOINDEX(s, r) & sid = HDF_SD_SELECT(s, i) & HDF_SD_GETINFO, sid, NAME=nm & IF nm EQ "Colatitude" THEN id = sid')
+FOREACH r, refs DO lp_colat, sd_id, r, sds_id
+HDF_SD_GETDATA, sds_id, colat
+HDF_SD_ENDACCESS, sds_id
+
+; Search "Longitude" dataset under the "Hourbox Data" group.
+lp_lon = LAMBDAP('s,r,id: i = HDF_SD_REFTOINDEX(s, r) & sid = HDF_SD_SELECT(s, i) & HDF_SD_GETINFO, sid, NAME=nm & IF nm EQ "Longitude" THEN id = sid')
+FOREACH r, refs DO lp_lon, sd_id, r, sds_id
+HDF_SD_GETDATA, sds_id, lon
+HDF_SD_ENDACCESS, sds_id
+
+; Close file for SDS.
+HDF_SD_END, sd_id
+
+; Detach VGroup.
+FOREACH i, v DO HDF_VG_DETACH, i
+
+; Close file for H interface.
+HDF_CLOSE, fid
+
+; Convert data type.
+dataf=FLOAT(data)
+lon=FLOAT(lon)
+colat=FLOAT(colat)
+
+; Process fill value.
+idx=WHERE(data EQ fillvalue(0), cnt)
+if cnt gt 0 then dataf[idx]=!Values.F_NAN
+
+; Adjust lat/lon.
+lat=90-colat
+lon[WHERE(lon GT 180)] = lon[WHERE(lon GT 180)] - 360
+
+; Filter NaN data for SCATTERPLOT() and faster processing.
+idx=where(dataf eq dataf, cnt)
+datar = dataf[idx]
+latr = lat[idx]
+lonr = lon[idx]
+
+; Compute data min/max for colorbar.
+datamin=MIN(data, /NAN)
+datamax=MAX(data, /NAN)
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+
+c1 = SCATTERPLOT(lonr[*], latr[*], OVERPLOT=m, $
+                 MAGNITUDE = datar[*], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, 'Longwave flux ('+long_name+')')
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], /BORDER, ORIENTATION=1, $
+              TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, WIDTH=800, HEIGHT=600
+
+EXIT
+
+; Reference
+;
+; [1] https://www.l3harrisgeospatial.com/docs/routines-103.html

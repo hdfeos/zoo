@@ -1,0 +1,111 @@
+"""
+
+This example code illustrates how to read multiple LAADS MOD04_3K Swath
+files and calculate seasonal average at a specific lat/lon point in Python.
+
+If you have any questions, suggestions, or comments on this example, please use
+the HDF-EOS Forum (http://hdfeos.org/forums).  If you would like to see an
+example of any other NASA HDF/HDF-EOS data product that is not listed in the
+HDF-EOS Comprehensive Examples page (http://hdfeos.org/zoo), feel free to
+contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS Forum
+(http://hdfeos.org/forums).
+
+Usage:  save this script and run
+
+    $python MOD04_3K.A2022.s.py
+
+The HDF files must be in your current working directory.
+
+Tested under: Python 3.9.1 :: Miniconda
+Last updated: 2023-04-04
+"""
+
+import os
+import glob
+import datetime
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from pyhdf.SD import SD, SDC
+
+
+DATAFIELD_NAME ='Optical_Depth_Land_And_Ocean'
+
+# Subset region.
+# lon = 10 : 11 E
+# lat = 40 : 41 N
+
+latbounds = [ 10 , 11 ]
+lonbounds = [ 40 , 41 ]
+
+l = []
+
+for file in sorted(glob.glob('MOD04_3K.A202*.hdf')):
+
+    print(file)
+    reader = open(file)
+    hdf = SD(file, SDC.READ)
+
+    # Read dataset.
+    data2D = hdf.select(DATAFIELD_NAME)
+    data = data2D[:,:].astype(np.double)
+
+    # Read geolocation dataset.
+    lat = hdf.select('Latitude')
+    latitude = lat[:,:]
+    lon = hdf.select('Longitude')
+    longitude = lon[:,:]
+
+    # Retrieve attributes.
+    attrs = data2D.attributes(full=1)
+    aoa=attrs["add_offset"]
+    add_offset = aoa[0]
+    fva=attrs["_FillValue"]
+    _FillValue = fva[0]
+    sfa=attrs["scale_factor"]
+    scale_factor = sfa[0]        
+    ua=attrs["units"]
+    units = ua[0]
+    data[data == _FillValue] = np.nan
+    data = (data - add_offset) * scale_factor 
+    datam = np.ma.masked_array(data, np.isnan(data))
+
+    # Get indices of lat/lon within the boundary.
+    i = ((latitude > latbounds[0]) & (latitude < latbounds[1]) &
+         (longitude > lonbounds[0]) & (longitude < lonbounds[1]))
+    flag = not np.any(i)
+    if flag:
+        print('No data for the region.')
+    else:
+        if (np.isnan(data[i]).all()):
+            print('All values are NaN.')
+        else:
+            m = np.nanmean(data[i])
+            print(m)
+            year = file[10:14]
+            print(year)
+            day = file[14:17]
+            timebase = datetime.datetime(int(year), 1, 1, 0, 0, 0)
+            dt = timebase + datetime.timedelta(int(day) - 1)
+            mo = int(dt.month)
+            print(mo)
+            s = np.floor(mo / 3)
+            print(s)
+            if s == 4:
+                s = 0
+            l.append([s, m])
+            
+df = pd.DataFrame(l, columns=['Season', 'Mean'])
+print(df)
+t = '{0}\n{1}'.format('MOD04_3K 2022 Seasonal Average at 40.0E & 10.0N',
+                      DATAFIELD_NAME)
+xl = '0=winter 1=spring 2=summer 3=fall'
+plt = df.groupby('Season').mean().plot(title = t, xlabel = xl)
+fig = plt.get_figure()
+
+# Save image.
+pngfile = "MOD04_3K.A2022.s.py.png"
+fig.savefig(pngfile)
+    

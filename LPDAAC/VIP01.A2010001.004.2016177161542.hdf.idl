@@ -1,0 +1,148 @@
+;
+;  This example code illustrates how to access and visualize LP DAAC
+; MEaSUREs VIP01 version 4 HDF-EOS2 Grid file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+; $idl VIP01.A2010001.004.2016177161542.hdf.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2018-05-07
+
+; Define file name, grid name, and data field.
+file_name='VIP01.A2010001.004.2016177161542.hdf'
+grid_name='VIP_CMG_GRID'
+datafield_name='CMG 0.05 Deg Daily NDVI'
+
+; Open file.
+file_id = EOS_GD_OPEN(file_name)
+
+; Retrieve data.
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+status = EOS_GD_READFIELD(grid_id, datafield_name, data)
+status = EOS_GD_GRIDINFO(grid_id, xdimsize, ydimsize, upleft, lowright)
+status = EOS_GD_PIXREGINFO(grid_id, pixregcode)
+status = EOS_GD_DETACH(grid_id)
+
+; Close file.
+status = EOS_GD_CLOSE(file_id)
+
+; Retrieve long_name, _FillValue, units, scale_factor, and valid_range.
+file_id_hdf=HDF_SD_START(file_name, /READ)
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+valid_range_index=HDF_SD_ATTRFIND(sds_id, 'valid_range')
+HDF_SD_ATTRINFO, sds_id, valid_range_index, data=valid_range
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+scalefactor_index=HDF_SD_ATTRFIND(sds_id, 'scale_factor')
+HDF_SD_ATTRINFO, sds_id, scalefactor_index, DATA=scale_factor
+
+
+HDF_SD_ENDACCESS, sds_id
+HDF_SD_END, file_id_hdf
+
+; Compute lat / lon data.
+; 
+; We assume that HDFE_CENTER is 0 by default. See GDdefpixreg() in 
+; "HDF-EOS Library Users Guide for the ECS Project Volume 2: Function
+; Reference Guide".
+IF (pixregcode EQ 1) THEN PRINT, 'ERROR:Pixel is not centered.' 
+IF (pixregcode EQ 1) THEN EXIT
+
+; Pixel must be centered.
+offsetX = 0.5
+offsetY = 0.5
+
+; We need to readjust the limits of latitude and longitude. 
+; HDF-EOS is using DMS(DDDMMMSSS.SS) format to represent degrees.
+; To calculate the lat and lon in degrees, one needs to convert
+; minutes and seconds into degrees. 
+
+; The following is the detailed description on how to calculate the
+; latitude  and longitude range based on lowright and upleft.
+; One should observe the fact that 1 minute is 60 seconds and 1 degree 
+; is 60 minutes. 
+
+; First calculate the difference of .SS between lowright and upleft.
+; Since the resulting number is very large, you need to specify /L64.
+lowright_ss= lowright*100-FLOOR(lowright, /L64)*100
+upleft_ss = upleft*100-FLOOR(upleft, /L64)*100;
+dss = lowright_ss - upleft_ss;
+
+; Calculate the difference of SSS between lowright and upleft.
+lowright_s = FLOOR(lowright) MOD 1000
+upleft_s = FLOOR(upleft) MOD 1000
+ds = lowright_s - upleft_s +dss/100;
+
+; Calculate the difference of MMM between lowright and upleft.
+lowright_m = FLOOR(lowright/1000) MOD 1000
+upleft_m = FLOOR(upleft/1000) MOD 1000
+dm = lowright_m-upleft_m +ds/60;
+
+; Calculate the difference of DDD between lowright and upleft.
+lowright_d = FLOOR(lowright/1000000)
+upleft_d = FLOOR(upleft/1000000)
+dd = lowright_d-upleft_d+dm/60
+
+lat_limit = dd(1);
+lon_limit = dd(0);
+
+; We need to calculate the grid space interval between two adjacent points.
+scaleX = lon_limit/xdimsize
+scaleY = lat_limit/ydimsize
+
+lon_value= FINDGEN(xdimsize)
+lat_value= FINDGEN(ydimsize)
+FOR i=0,xdimsize-1 DO lon_value(i) = (i+offsetX)*(scaleX) + upleft_d(0);
+FOR j=0,ydimsize-1 DO lat_value(j) = (j+offsetX)*(scaleY) + upleft_d(1);
+
+lon = FLOAT(lon_value)
+lat = FLOAT(lat_value)
+
+; Convert data type.
+dataf=FLOAT(data)
+
+; Process fillvalue.
+idx=WHERE(data EQ fillvalue(0), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Parse valid_range string.
+strs = STRSPLIT(valid_range, ',', /EXTRACT)
+
+; Process valid range values.
+idx=WHERE(data LT strs(0) OR data GT strs(1), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Apply scale factor and offset according to the attribute
+dataf = dataf / scale_factor(0)
+
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, long_name)
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, $
+              TEXTPOS=1, POSITION=[0.85,0.3,0.87,0.7], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, WIDTH=800, HEIGHT=600
+EXIT

@@ -1,0 +1,179 @@
+;  This example code illustrates how to access and visualize NSIDC AMSR_E
+; Grid file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Define file name, grid name, and data field.
+FILE_NAME='AMSR_E_L3_MonthlyOcean_V03_200206.hdf'
+GRID_NAME='GlobalGrid'
+DATAFIELD_NAME='Med_res_vapor'
+
+; Open file.
+file_id = EOS_GD_OPEN(FILE_NAME)
+
+; Attach grid.
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+
+; Retrieve data.
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, data)
+status = EOS_GD_GRIDINFO(grid_id, xdimsize, ydimsize, upleft, lowright)
+status = EOS_GD_PIXREGINFO(grid_id, pixregcode)
+
+; Detach grid.
+status = EOS_GD_DETACH(grid_id)
+
+; Close file.
+status = EOS_GD_CLOSE(file_id)
+
+
+; Retrieve "Unit" and "Scale" attributes.
+;
+; Since HDF-EOS2 specific IDL routines (e.g., EOS_GD_...()) cannot access
+; data field attributes, we need to open it with generic HDF4 specific IDL
+; routines (e.g., HDF_SD...()).
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+index = HDF_SD_NAMETOINDEX(newFileID, DATAFIELD_NAME)
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'Unit')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=UNIT
+scalefactor_index=HDF_SD_ATTRFIND(thisSdsID, 'Scale')
+HDF_SD_ATTRINFO, thisSdsID, scalefactor_index, DATA=scale_factor
+HDF_SD_END, newFileID
+
+; Compute lat / lon data.
+; 
+; We assume that HDFE_CENTER is 0 by default. See GDdefpixreg() in 
+; "HDF-EOS Library Users Guide for the ECS Project Volume 2: Function
+; Reference Guide".
+IF (pixregcode EQ 1) THEN PRINT, 'ERROR:Pixel is not centered.' 
+IF (pixregcode EQ 1) THEN EXIT
+
+; Pixel must be centered.
+offsetX = 0.5
+offsetY = 0.5
+
+; We need to readjust the limits of latitude and longitude. 
+; HDF-EOS is using DMS(DDDMMMSSS.SS) format to represent degrees.
+; To calculate the lat and lon in degrees, one needs to convert
+; minutes and seconds into degrees. 
+
+; The following is the detailed description on how to calculate the
+; latitude  and longitude range based on lowright and upleft.
+; One should observe the fact that 1 minute is 60 seconds and 1 degree 
+; is 60 minutes. 
+
+; First calculate the difference of .SS between lowright and upleft.
+; Since the resulting number is very large, you need to specify /L64.
+lowright_ss= lowright*100-FLOOR(lowright, /L64)*100
+upleft_ss = upleft*100-FLOOR(upleft, /L64)*100;
+dss = lowright_ss - upleft_ss;
+
+; Calculate the difference of SSS between lowright and upleft.
+lowright_s = floor(lowright) MOD 1000
+upleft_s = floor(upleft) MOD 1000
+ds = lowright_s - upleft_s +dss/100;
+
+; Calculate the difference of MMM between lowright and upleft.
+lowright_m = floor(lowright/1000) MOD 1000
+upleft_m = floor(upleft/1000) MOD 1000
+dm = lowright_m-upleft_m +ds/60;
+
+; Calculate the difference of DDD between lowright and upleft.
+lowright_d = floor(lowright/1000000)
+upleft_d = floor(upleft/1000000)
+dd = lowright_d-upleft_d+dm/60
+
+lat_limit = dd(1);
+lon_limit = dd(0);
+
+; We need to calculate the grid space interval between two adjacent points.
+scaleX = lon_limit/xdimsize
+scaleY = lat_limit/ydimsize
+
+lon_value= FINDGEN(xdimsize)
+lat_value= FINDGEN(ydimsize)
+for i=0,xdimsize-1 do lon_value(i) = (i+offsetX)*(scaleX) + upleft_d(0);
+for j=0,ydimsize-1 do lat_value(j) = (j+offsetX)*(scaleY) + upleft_d(1);
+
+lon = float(lon_value)
+lat = float(lat_value)
+
+; Compute data.
+; Convert data type since it is 16 bit integer.
+; Type conversion is necessary to process fill value.
+dataf=float(data)
+
+; Apply scale factor according to Table 3 in [1].
+dataf = scale_factor(0) * dataf
+
+; Read fill value from data directly using HDFView.
+fillvalue = -9999
+; Process fill value.
+idx=where(data eq fillvalue, cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+;print, dataf
+
+; Get max and min value of data.
+datamin = min(dataf, /NAN)
+datamax = max(dataf, /NAN)
+
+
+
+;   The following code is prepared for colorbar. 
+;
+;   If you require colorbar in your plot, you could download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' ahead of coding. 
+;
+;    Add the coyote directory you create on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+levels = 254
+device, decomposed=0
+LoadCT, 33, Ncolors=levels, Bottom=1
+Window, Title = 'FIELD:' + DATAFIELD_NAME + '  '+'UNIT:'+UNIT, XSIZE=800
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, POSITION=[0.05, 0.05, 0.82, 0.82]
+
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL,  C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+
+; Draw title and unit.
+XYOuts, 0.05, 0.86, /Normal, 'FIELD:' + DATAFIELD_NAME, $
+  Charsize=1.25, color=black, Alignment=0.0
+XYOuts, 0.82, 0.86, /Normal, 'UNIT:' + UNIT, $ 
+  Charsize=1.25, Color=black, Alignment=1.0
+XYOuts, 0.43, 0.92, /Normal, FILE_NAME, $
+  Charsize=1.75, Color=black, Alignment=0.5
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, Range=[datamin, datamax], Ncolors=levels, /Vertical, $ 
+  Position=[0.9,0.05,0.94,0.8], FORMAT='(F5.2)'
+
+; Reference
+;
+; [1] AMSR-E/Aqua L2B and L3 Ocean Products.
+;     http://nsidc.org/data/docs/daac/ae_ocean_products.gd.html
+; [2] Coyote's Guide to IDL Programming.
+;     http://www.dfanning.com/documents/programs.html
+

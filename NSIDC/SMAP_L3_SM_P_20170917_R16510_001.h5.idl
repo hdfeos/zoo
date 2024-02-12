@@ -1,0 +1,93 @@
+;
+;  This example code illustrates how to access and visualize SMAP L3 file
+; in IDL.
+;
+;  If you have any questions, suggestions, comments on this example, please 
+; use the HDF-EOS Forum (http://hdfeos.org/forums). 
+; 
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org 
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;                               
+; $idl SMAP_L3_SM_P_20170917_R16510_001.h5.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2019-09-26
+
+; Open file.
+file_name='SMAP_L3_SM_P_20170917_R16510_001.h5'
+file_id=H5F_OPEN(file_name)
+
+
+; Retrieve data.
+datafield_name='/Soil_Moisture_Retrieval_Data_AM/soil_moisture'
+data_id=H5D_OPEN(file_id, datafield_name)
+dataf=H5D_READ(data_id)
+
+; Get '_FillValue' attribute.
+fv_id=H5A_OPEN_NAME(data_id, '_FillValue')
+fv=H5A_READ(fv_id)
+H5A_CLOSE, fv_id
+
+; Get 'valid_min' attribute.
+vmin_id=H5A_OPEN_NAME(data_id, 'valid_min')
+valid_min=H5A_READ(vmin_id)
+H5A_CLOSE, vmin_id
+
+; Get 'valid_max' attribute.
+vmax_id=H5A_OPEN_NAME(data_id, 'valid_max')
+valid_max=H5A_READ(vmax_id)
+H5A_CLOSE, vmax_id
+
+; Get 'long_name' attribute.
+title_id=H5A_OPEN_NAME(data_id, 'long_name')
+long_name=H5A_READ(title_id)
+H5A_CLOSE, title_id
+
+; Get 'units' attribute.
+units_id=H5A_OPEN_NAME(data_id, 'units')
+units=H5A_READ(units_id)
+H5A_CLOSE, units_id
+
+; Close dataset.
+H5D_CLOSE, data_id
+
+; Retrieve lat/lon.
+lat_name='/Soil_Moisture_Retrieval_Data_AM/latitude'
+lat_id=H5D_OPEN(file_id, lat_name)
+lat=H5D_READ(lat_id)
+H5D_CLOSE, lat_id
+
+lon_name='/Soil_Moisture_Retrieval_Data_AM/longitude'
+lon_id=H5D_OPEN(file_id, lon_name)
+lon=H5D_READ(lon_id)
+H5D_CLOSE, lon_id
+
+; Close file.
+H5F_CLOSE, file_id
+
+; Process fill value.
+idx = where(dataf eq fv(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+; Process valid_range values.
+idx=where(dataf LT valid_min(0) OR dataf GT valid_max(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+
+t1 = TEXT(0.1, 0.1, long_name)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+

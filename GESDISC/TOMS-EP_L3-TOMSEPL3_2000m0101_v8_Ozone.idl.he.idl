@@ -1,0 +1,154 @@
+; This example code illustrates how to access and visualize GESDISC
+; TRMM Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+; Refer to: TOMS-EP_L3-TOMSEPL3_2000m0101_v8.HDF
+; DataField name: Ozone
+
+; IDL example for reading GESDISC_MODIS_TOMS Grid file
+; GEO projection
+
+; Open file
+  file_name='TOMS-EP_L3-TOMSEPL3_2000m0101_v8.HDF'
+  file_id=EOS_GD_OPEN(file_name)
+
+; Define Grid name
+  grid_name='TOMS Level 3'
+  datafield_name='Ozone'
+
+; retrieve data
+  grid_id = EOS_GD_ATTACH(file_id, grid_name)
+  status = EOS_GD_READFIELD(grid_id, datafield_name, data)
+
+; close file
+  status = EOS_GD_DETACH(grid_id)
+  status = EOS_GD_CLOSE(file_id)
+
+; use HDF4 file commander to read out lat and lon
+  file_name='TOMS-EP_L3-TOMSEPL3_2000m0101_v8.HDF'
+  newFileID=HDF_SD_START(file_name, /READ)
+
+; retrieve lat
+; field name should be defined as "YDim:TOMS Level 3" instead of "YDim:TOMS Level 3 (dimension)"
+  datafield_name="YDim:TOMS Level 3"
+  index=HDF_SD_NAMETOINDEX(newFileID,datafield_name)
+
+  thisSdsID=HDF_SD_SELECT(newFileID, index)
+  HDF_SD_GETDATA, thisSdsID, lat
+
+; retrieve lon
+; field name should be defined as "XDim:TOMS Level 3" instead of "XDim:TOMS Level 3 (dimension)"
+  datafield_name="XDim:TOMS Level 3"
+  index=HDF_SD_NAMETOINDEX(newFileID,datafield_name)
+
+  thisSdsID=HDF_SD_SELECT(newFileID, index)
+  HDF_SD_GETDATA, thisSdsID, lon
+
+; Close file
+  HDF_SD_END, newFileID
+
+; retrieve units and fillvalue
+  file_name='TOMS-EP_L3-TOMSEPL3_2000m0101_v8.HDF'
+  newFileID=HDF_SD_START(file_name, /READ)
+
+  datafield_name='Ozone'
+  index=HDF_SD_NAMETOINDEX(newFileID, datafield_name)
+
+  thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+  fillvalue_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+  HDF_SD_ATTRINFO, thisSdsID, fillvalue_index, DATA=fillvalue
+
+  units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+  HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+  HDF_SD_END, newFileID
+ 
+; Convert data type
+  dataf=float(data)
+  fillvaluef=float(fillvalue(0))
+
+; Process fill values, convert data that are equal to fillvalue to NaN
+  idx=WHERE(dataf eq fillvaluef, cnt)
+  IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Process valid_range.
+  idx=WHERE(dataf LT valid_range(0) OR dataf GT valid_range(1), cnt)
+  IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Get max and min value of data for color bar.
+  datamin = MIN(dataf, /NAN)
+  datamax = MAX(dataf, /NAN)
+
+; The following coding is prepared for colorbar. If you require colorbar in your plot, you could download Dr. 
+; Fan's Coyote Library from (http://www.dfanning.com/documents/programs.html). Make a directory named coyote 
+; somewhere on your machine, and extract the Coyote files into it. If color bar is not not necessary for your
+; plot, you can ignore this step and add comment character ';' ahead of coding. 
+; Add the coyote directory you create on your machine to your IDL path. 
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+  !PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; Prepare field name title using long name attribute.
+  field = datafield_name
+  units = 'DU'
+
+; Generate a plot.
+  levels=254
+  device,decomposed=0
+  LoadCT,33, Ncolors=levels, Bottom=1
+  WINDOW, Title = 'FIELD:' + field + '   ' + 'UNIT:' + units, XSIZE=800, YSIZE=500
+  MAP_SET, /GRID, /CONTINENTS,XMARGIN=5, YMARGIN=5, $
+    POSITION=[0.05, 0.06, 0.82, 0.80]
+  CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+  MAP_GRID, /BOX_AXES, COLOR=255
+  MAP_CONTINENTS, COLOR=255
+
+; Draw file name, field name, and unit.
+  XYOUTS, 0.05, 0.86, /NORMAL, 'FIELD:' + field, $
+    CHARSIZE=1.25,  ALIGNMENT=0.0
+  XYOUTS, 0.94, 0.86, /NORMAL, 'UNIT:' + units, $ 
+    CHARSIZE=1.25,  ALIGNMENT=1.0
+  XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+    CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+; If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [1]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+; If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+; Add the coyote directory that you created on your machine to your IDL
+; path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+; We assume that the coyote library is installed under the current working
+; directory that this code exists.
+  !PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+; The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+; If you don't need a color bar in your plot, you can ignore this step
+; by adding comment character ';' at the beginning of the code.
+  COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+   POSITION=[0.9,0.08,0.94,0.8]
+
+; Write JPEG image file.
+  im = TVRD(TRUE=3)
+  jpg = 'TOMS-EP_L3-TOMSEPL3_2000m0101_v8_Ozone.idl.JPG' 
+  WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; Reference
+;
+; [1] http://www.dfanning.com/documents/programs.html

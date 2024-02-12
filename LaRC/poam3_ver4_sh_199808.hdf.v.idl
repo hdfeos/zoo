@@ -1,0 +1,135 @@
+;
+;  This example code illustrates how to access and visualize LaRC POAM3
+; Level 2 HDF4 file in IDL. 
+;
+;  If you have any questions, suggestions, comments on this example, please use
+; the HDF-EOS Forum (http://hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or 
+; post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  %idl poam3_ver4_sh_199808.hdf.v.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2022-05-19
+
+
+; Open file.
+file_name = 'poam3_ver4_sh_199808.hdf'
+fid = HDF_SD_START(file_name, /READ)
+
+; Read aerosol dataset.
+data_name = 'aerosol'
+index = HDF_SD_NAMETOINDEX(fid, data_name)
+
+sds_id = HDF_SD_SELECT(fid, index)
+HDF_SD_GETDATA, sds_id, aerosol
+
+long_name_index = HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+units_index = HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+fv_index = HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fv_index, DATA=fv
+
+HDF_SD_ENDACCESS, sds_id
+
+; Read dates.
+date_name = 'date'
+index = HDF_SD_NAMETOINDEX(fid, date_name)
+sds_id = HDF_SD_SELECT(fid, index)
+HDF_SD_GETDATA, sds_id, date
+HDF_SD_ENDACCESS, sds_id
+
+; Read seconds.
+sec_name = 'sec'
+index = HDF_SD_NAMETOINDEX(fid, sec_name)
+sds_id = HDF_SD_SELECT(fid, index)
+HDF_SD_GETDATA, sds_id, sec
+HDF_SD_ENDACCESS, sds_id
+
+; Read wavelength.
+data_name = 'wavelength'
+index = HDF_SD_NAMETOINDEX(fid, data_name)
+sds_id = HDF_SD_SELECT(fid, index)
+HDF_SD_GETDATA, sds_id, wv
+
+wv_long_name_index = HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, wv_long_name_index, DATA=wv_long_name
+
+wv_units_index = HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, wv_units_index, DATA=wv_units
+
+HDF_SD_ENDACCESS, sds_id
+
+; Read altitude.
+data_name = 'z_aerosol'
+index = HDF_SD_NAMETOINDEX(fid, data_name)
+sds_id = HDF_SD_SELECT(fid, index)
+HDF_SD_GETDATA, sds_id, alt
+
+units_index = HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=a_units
+
+long_name_index = HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=a_long_name
+
+
+HDF_SD_ENDACCESS, sds_id
+
+; Close file.
+HDF_SD_END, fid
+
+; Subset data.
+wv_index = 0
+data = aerosol(*, wv_index, *)
+
+; Make 2D.
+data = reform(data)
+
+; Process fill value.
+idx=where(data eq fv(0), cnt)
+if cnt gt 0 then data[idx] = !Values.F_NAN
+
+; Process date time.
+h = FLOOR(sec / 3600)
+dt = STRING(date)
+y = FIX(dt.Substring(4,7))
+m = FIX(dt.Substring(8,9))
+d = FIX(dt.Substring(10,11))
+tv = JulDay(m, d, y, h)
+
+; Set text label.
+longname = long_name + ' at Wavelength=' + STRTRIM(STRING(wv[wv_index]), 1)
+longname = longname + '(' + wv_units + ')'
+
+; Generate the plot.
+ct = COLORTABLE(13)
+
+; See [1].
+dummy = LABEL_DATE(DATE_FORMAT='%M/%D')
+c1 = CONTOUR(data, tv, alt, /FILL, /BUFFER, $
+             RGB_TABLE=ct, $
+             TITLE=file_name, $
+             XSTYLE=1, $ ; See [2].
+             XTICKFORMAT='LABEL_DATE', $
+             YTITLE=a_long_name + ' (' + a_units + ')', $
+             POSITION=[0.1, 0.1, 0.82, 0.8])
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, $
+              POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+t1 = TEXT(0.25, 0.8, longname)
+
+png = file_name + '.v.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+
+; References
+;
+; [1] https://www.l3harrisgeospatial.com/docs/label_date.html
+; [2] https://www.l3harrisgeospatial.com/docs/contour.html

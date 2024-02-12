@@ -1,0 +1,181 @@
+;
+;  This example code illustrates how to access and visualize LAADS MYD021KM v6
+;  HDF-EOS2 Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+; 
+; Usage:
+;                               
+; $idl MYD02HKM.A2002226.0000.006.2012033082925.hdf.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2018-02-19
+
+; Open file.
+file_name='MYD02HKM.A2015125.0115.006.2015125153005.hdf'
+file_id=EOS_SW_OPEN(file_name)
+
+
+; Attach Swath.
+swath_name='MODIS_SWATH_Type_L1B'
+swath_id=EOS_SW_ATTACH(file_id, swath_name)
+
+; Retrieve data.
+datafield_name='EV_500_RefSB'
+status=EOS_SW_READFIELD(swath_id,datafield_name,data)
+
+; Retrieve dimension info for title of the plot.
+status=EOS_SW_FIELDINFO(swath_id,datafield_name,rank,dims,numbertype,dimlist)
+
+; Detach Swath.
+status=EOS_SW_DETACH(swath_id)
+
+; Close file.
+status=EOS_SW_CLOSE(file_id)
+
+
+; Retrieve long_name, _FillValue, units, scale factor, and offset 
+; attributes. 
+; 
+; Please read the page 34 of "MODIS Level 1B Product User's Guide" [1] 
+; carefully before you proceed.
+;
+; In this example, we'll compute and plot the radiance according to [1].
+;
+; If you want to compute reflectance, 
+;  read "reflectance_scales", "reflectance_offsets", and "reflectance_units"
+;  attributes.
+;
+; Then, apply 
+;  reflectance =  reflectance_scales * (data - reflectance_offsets).
+file_id_hdf=HDF_SD_START(file_name, /READ)
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+valid_range_index=HDF_SD_ATTRFIND(sds_id, 'valid_range')
+HDF_SD_ATTRINFO, sds_id, valid_range_index, data=valid_range
+
+scalefactor_index=HDF_SD_ATTRFIND(sds_id, 'reflectance_scales')
+HDF_SD_ATTRINFO, sds_id, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(sds_id, 'reflectance_offsets')
+HDF_SD_ATTRINFO, sds_id, offset_index, data=offset
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'reflectance_units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+HDF_SD_ENDACCESS, sds_id
+HDF_SD_END, file_id_hdf
+
+
+; Convert data type.
+dataf=float(data)
+
+; Subset data.
+lev = 0
+dataf=dataf[*,*,lev]
+
+; Process fillvalue.
+idx=WHERE(data EQ fillvalue(0), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Process valid_range.
+idx=WHERE(data LT valid_range(0) OR data GT valid_range(1), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Apply scale factor and offset.
+dataf = scale_factor(0) * (dataf - offset(0)) 
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; We need to use eosdump to generate lat and lon.
+; To properly display the data, the latitude/longitude must be
+; remapped.
+
+; Retrieve dimension size of data.
+dimsize=SIZE(dataf,/dim)
+numlat=dimsize(0)
+numlon=dimsize(1)
+size=numlat*numlon
+
+; Read eosdump output file for latitude.
+OPENR, 1, $
+  'lat_MYD02HKM.A2015125.0115.006.2015125153005.output'
+lat_input=FLTARR(size)
+READF, 1, lat_input
+
+lat=FINDGEN(numlat,numlon)
+lat=REFORM(lat_input,numlat,numlon)
+
+; Read eosdump output file for longitude.
+OPENR, 2, $
+  'lon_MYD02HKM.A2015125.0115.006.2015125153005.output'
+lon_input=FLTARR(size)
+READF, 2, lon_input
+lon=FINDGEN(numlat,numlon)
+lon=REFORM(lon_input,numlat,numlon)
+
+; Get min/max value of lat and lon for zoomed image.
+latmin=MIN(lat)
+latmax=MAX(lat)
+lonmin=MIN(lon)
+lonmax=MAX(lon)
+
+; Prepare field name title using long name attribute.
+dimlist = STRSPLIT(dimlist, ',', /EXTRACT)
+; The '!C' means carriage return. We need it since name is really long.
+field = 'Reflectance derived from ' + long_name(0) + '!C      at ' $
+  + dimlist(rank-1) + '=' + STRING(lev, FORMAT='(I1)')
+
+; Generate a plot.
+; c_lon = MEDIAN(lon)
+; c_lat = MEDIAN(lat)
+c_lon = lon[numlat/2, numlon/2]
+c_lat = lat[numlat/2, numlon/2]
+
+; Get min/max value of lat and lon for zoomed image.
+latmin=MIN(lat)
+latmax=MAX(lat)
+lonmin=MIN(lon)
+lonmax=MAX(lon)
+
+; Use LIMIT for zoom-in effect.
+m = MAP('Orthographic', TITLE=file_name, FONT_SIZE=9, /BUFFER, $
+        CENTER_LONGITUDE = c_lon,  CENTER_LATITUDE = c_lat, $
+        LIMIT=[latmin, lonmin, latmax, lonmax])
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, field)
+
+;c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+;             RGB_TABLE=ct, $
+;             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+c1 = SCATTERPLOT(lon[*], lat[*], OVERPLOT=m, $
+                 MAGNITUDE = dataf[*], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1,$
+              RANGE=[datamin, datamax], POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+
+; Reference
+;
+; [1] MODIS Level 1B Product User's Guide
+;     http://mcst.gsfc.nasa.gov/uploads/files/M1054_RevC_PUG_022709_Update.pdf

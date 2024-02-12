@@ -1,0 +1,171 @@
+;
+;  This example code illustrates how to access and visualize GES DISC MEaSUREs
+; Ozone swath HDF5 file in IDL.
+;
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl SBUV2-NOAA17_L2-SBUV2N17L2_2011m1231_v01-02-2013m0828t143157.h5.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2019-11-05
+
+; Open file.
+file_name='SBUV2-NOAA17_L2-SBUV2N17L2_2011m1231_v01-02-2013m0828t143157.h5'
+file_id=H5F_OPEN(file_name)
+
+; Read data.
+datafield_name='/SCIENCE_DATA/ProfileO3Retrieved'
+data_id=H5D_OPEN(file_id,datafield_name)
+data=H5D_READ(data_id)
+
+; Get title.
+title_id=H5A_OPEN_NAME(data_id, 'long_name')
+title=H5A_READ(title_id)
+H5A_Close, title_id
+
+; Get units.
+units_id=H5A_OPEN_NAME(data_id, 'units')
+units=H5A_READ(units_id)
+H5A_Close, units_id
+
+; Get valid_min value.
+valid_min_id=H5A_OPEN_NAME(data_id,'valid_min')
+valid_min=H5A_READ(valid_min_id)
+H5A_Close, valid_min_id
+
+; Get valid_max value.
+valid_max_id=H5A_OPEN_NAME(data_id,'valid_max')
+valid_max=H5A_READ(valid_max_id)
+H5A_Close, valid_max_id
+
+; Get fill value.
+fillvalue_id=H5A_OPEN_NAME(data_id,'_FillValue')
+fillvalue=H5A_READ(fillvalue_id)
+H5A_Close, fillvalue_id
+
+; Close dataset.
+H5D_Close, data_id
+
+; Read latitude.
+latitude_name='/GEOLOCATION_DATA/Latitude'
+latitude_id=H5D_OPEN(file_id, latitude_name)
+lat=H5D_READ(latitude_id)
+
+; Get title.
+title_id=H5A_OPEN_NAME(latitude_id, 'long_name')
+title_lat=H5A_READ(title_id)
+H5A_Close, title_id
+
+; Get units.
+units_id=H5A_OPEN_NAME(latitude_id, 'units')
+units_lat=H5A_READ(units_id)
+H5A_Close, units_id
+
+; Close dataset.
+H5D_Close, latitude_id
+
+; Read Pressure.
+pressure_name='/ANCILLARY_DATA/PressureLevels'
+pressure_id=H5D_OPEN(file_id, pressure_name)
+pressure=H5D_READ(pressure_id)
+
+; Get title.
+title_id=H5A_OPEN_NAME(pressure_id, 'long_name')
+title_pressure=H5A_READ(title_id)
+H5A_Close, title_id
+
+; Get units.
+units_id=H5A_OPEN_NAME(pressure_id, 'units')
+units_pressure=H5A_READ(units_id)
+H5A_Close, units_id
+
+; Close dataset.
+H5D_Close, pressure_id
+
+; Read Time.
+Time_name='nTimes'
+time_id=H5D_OPEN(file_id,Time_name)
+time=H5D_READ(time_id)
+H5D_Close, time_id
+
+; Close file.
+H5F_Close, file_id
+
+; Convert type to double.
+dataf = float(data)
+
+; Process valid_range values.
+idx=where(data LT valid_min(0) OR data GT valid_max(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+
+; Process fill value.
+idx=where(data eq fillvalue(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+
+; Subset region that latitude values are monotonic. 
+; See NCL example for comparison.
+dataf = transpose(dataf(*, 0:70))
+lat = lat(0:70)
+
+; Set "from" time subset index.
+tdim = 0
+time_at = time(tdim)
+
+; Time's unit is TAI-93.
+start_time = JULDAY(1,1,1993, 0, 0, 0)
+sec = time_at / 86400
+t = start_time + sec
+CALDAT, t, Mo, D, Y, H, Mi, S
+tstring = STRING(Y, FORMAT='(I4)') + '-' + STRING(Mo, FORMAT='(I2.2)') + $
+          '-' + STRING(D, FORMAT='(I2.2)') + ' ' + STRING(H, FORMAT='(I2.2)') $ 
+          + ':' + STRING(Mi, FORMAT='(I2.2)') + ':' + STRING(S, FORMAT='(I2.2)')  
+
+; Set "to" time subset index.
+tdim = 70
+time_at = time(tdim)
+
+; Time's unit is TAI-93.
+start_time = JULDAY(1,1,1993, 0, 0, 0)
+sec = time_at / 86400
+t = start_time + sec
+CALDAT, t, Mo, D, Y, H, Mi, S
+tstring2 = STRING(Y, FORMAT='(I4)') + '-' $
+           + STRING(Mo, FORMAT='(I2.2)') + '-' $
+           + STRING(D, FORMAT='(I2.2)') + ' ' $
+           + STRING(H, FORMAT='(I2.2)') + ':' $
+           + STRING(Mi, FORMAT='(I2.2)') + ':' $
+           + STRING(S, FORMAT='(I2.2)')
+
+d_max=MAX(pressure)
+d_min=MIN(pressure)
+
+; Generate the plot.
+ct = COLORTABLE(13)
+c1 = CONTOUR(dataf,  lat, pressure, /FILL, /BUFFER, $
+             /YLOG, $
+             YRANGE=[d_max, d_min], $
+             RGB_TABLE=ct, $
+             TITLE=file_name, $
+             XTITLE=title_lat +' (' + units_lat + ')', $
+             YTITLE=title_pressure + ' (' + units_pressure + ')', $
+             POSITION=[0.1, 0.1, 0.82, 0.8])
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, $
+              POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+t1 = TEXT(0.25, 0.78, title)
+t2 = TEXT(0.25, 0.75, 'from ' + tstring + ' to ' + tstring2)
+
+; Write PNG image file.
+png = file_name + '.idl.png'   
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT

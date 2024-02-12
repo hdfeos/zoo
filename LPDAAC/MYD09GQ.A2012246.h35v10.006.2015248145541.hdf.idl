@@ -1,0 +1,163 @@
+;
+;  This example code illustrates how to access and visualize LP DAAC
+;  MYD09GQ v6 HDF-EOS2 Grid file in IDL. This file uses SINUSOIDAL projection.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;                               
+; $idl MYD09GQ.A2012246.h35v10.006.2015248145541.hdf.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2018-05-06
+;
+; Define file name, grid name, and data field.
+file_name='MYD09GQ.A2012246.h35v10.006.2015248145541.hdf'
+grid_name='MODIS_Grid_2D'
+datafield_name='sur_refl_b01_1'
+
+; Open file.
+file_id = EOS_GD_OPEN(file_name)
+
+; Attach Grid.
+grid_id = EOS_GD_ATTACH(file_id, grid_name)
+
+; Retrieve data.
+status = EOS_GD_READFIELD(grid_id, datafield_name, data)
+
+; Detach Grid.
+status = EOS_GD_DETACH(grid_id)
+
+; Close file
+status = EOS_GD_CLOSE(file_id)
+
+; Retrieve long_name, units, valid_range, _FillValue, and scale_factor
+;  attributes.
+file_id_hdf=HDF_SD_START(file_name, /READ)
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+valid_range_index=HDF_SD_ATTRFIND(sds_id, 'valid_range')
+HDF_SD_ATTRINFO, sds_id, valid_range_index, data=valid_range
+
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+scalefactor_index=HDF_SD_ATTRFIND(sds_id, 'scale_factor')
+HDF_SD_ATTRINFO, sds_id, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(sds_id, 'add_offset')
+HDF_SD_ATTRINFO, sds_id, offset_index, data=offset
+
+HDF_SD_ENDACCESS, sds_id
+HDF_SD_END, file_id_hdf
+
+; The file contains SINUSOIDAL projection. We need to use eosdump to
+; generate 1D lat and lon. For information on how to obtain the
+; lat/lon data, please check [1].
+
+; Retrieve dimension size of data
+dimsize=SIZE(data,/dim)
+numlat=dimsize(0)
+numlon=dimsize(1)
+size=numlat*numlon
+
+; Read eosdump output file for latitude.
+; Use the following command to generate latitude values in ASCII.
+; $eos2dump -c1 MYD09GQ.A2012246.h35v10.006.2015248145541.hdf > lat_MYD09GQ.A2012246.h35v10.006.2015248145541.output
+OPENR, 1, $
+  'lat_MYD09GQ.A2012246.h35v10.006.2015248145541.output'
+ValInlat=FLTARR(size)
+READF, 1, ValInlat
+
+lat=FINDGEN(numlat,numlon)
+lat=REFORM(ValInlat,numlat,numlon)
+
+; Read eosdump output file for longitude.
+; Use the following command to generate longitude values in ASCII.
+; $eos2dump -c2 MYD09GQ.A2012246.h35v10.006.2015248145541.hdf  > lon_MYD09GQ.A2012246.h35v10.006.2015248145541.output
+OPENR, 2, $
+  'lon_MYD09GQ.A2012246.h35v10.006.2015248145541.output'
+ValInlon=FltArr(size)
+READF, 2, ValInlon
+lon=FINDGEN(numlat,numlon)
+lon=REFORM(ValInlon,numlat,numlon)
+
+; Set the limits for zoomed image.
+; 
+; Please note that this data field covers near 180 longitude, which results
+; -180 for min value and 180 for max value although the data field
+; doesn't cover the entire longitude [-180, 180].
+;
+; Thus, unlike other IDL examples, We need to adjust map limits carefully.
+; We add 360 for longitude that is less than 0.
+; Then, look for min / max values.
+r = where((lon LE 0), count)
+lon(r) = lon(r) + 360
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+; Convert data type.
+dataf=FLOAT(data)
+
+; Process fill value.
+dataf[WHERE(data EQ fillvalue(0))] = !Values.F_NAN
+
+; Process valid range.
+dataf[WHERE(data LT valid_range(0) OR data GT valid_range(1))] = !Values.F_NAN
+
+; Apply scale factor and offset.
+dataf = (dataf - offset(0)) / scale_factor(0)
+
+; Get max and min value of data for color bar.
+datamin = min(dataf, /NAN)
+datamax = max(dataf, /NAN)
+
+; Get min/max value of lat and lon for zoomed image.
+latmin=MIN(lat)
+latmax=MAX(lat)
+lonmin=MIN(lon)
+lonmax=MAX(lon)
+
+; Generate plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER, $
+        LIMIT=[latmin, lonmin, latmax, lonmax])
+ct = COLORTABLE(72, /reverse)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, long_name)
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, $
+              TEXTPOS=1, POSITION=[0.85,0.3,0.87,0.7], TITLE=units)
+
+; Change grid property if you want to see lat label left.
+; For some reason, IDL doesn't show lon label at the bottom.
+; grid = m.MAPGRID
+; grid.LABEL_POSITION = 0
+
+png = file_name + '.idl.png'
+c1.save, png, WIDTH=800, HEIGHT=600
+EXIT
+
+; Reference
+;
+; [1] http://hdfeos.org/zoo/note_non_geographic.php
+
+
+
+

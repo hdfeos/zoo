@@ -1,0 +1,126 @@
+;This example code illustrates how to access and visualize LP_DAAC_MOD Grid file in IDL. 
+;If you have any questions, suggestions, comments  on this example, please use the HDF-EOS Forum (http://hdfeos.org/forums). 
+;If you would like to see an  example of any other NASA HDF/HDF-EOS data product that is not listed in the HDF-EOS Comprehensive Examples page (http://hdfeos.org/zoo), 
+;feel free to contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Refer to: MOD43B4.A2006353.h15v15.004.2007006030047.hdf
+; DataField name: Nadir_Reflectance
+
+; IDL example for reading LP_DAAC_MOD Grid file ---- Sinusoid projection
+; Open file
+FILE_NAME='MOD43B4.A2006353.h15v15.004.2007006030047.hdf'
+file_id = EOS_GD_OPEN(FILE_NAME)
+
+; Define grid name
+GRID_NAME='MOD_Grid_BRDF'
+
+; Define datafield
+DATAFIELD_NAME='Nadir_Reflectance'
+
+; Retrieve data
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, data)
+
+; Close file
+status = EOS_GD_DETACH(grid_id)
+status = EOS_GD_CLOSE(file_id)
+
+;retrieve fillvalue, units, scale factor and offset
+FILE_NAME='MOD43B4.A2006353.h15v15.004.2007006030047.hdf'
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+DATAFIELD_NAME='Nadir_Reflectance'
+index=HDF_SD_NAMETOINDEX(newFileID,DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+slope_index=HDF_SD_ATTRFIND(thisSdsID, 'scale_factor')
+HDF_SD_ATTRINFO, thisSdsID, slope_index, data=slope
+
+intercept_index=HDF_SD_ATTRFIND(thisSdsID, 'add_offset')
+HDF_SD_ATTRINFO, thisSdsID, intercept_index, data=intercept
+
+Fillvalue_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, Fillvalue_index, data=fillvalue
+
+HDF_SD_END, newFileID
+
+; Convert the M-D data to 2D data at Num_Land_Bands=5
+data=data(5,*,*)
+data=reform(data)
+
+; convert data type
+data=float(data)
+fillvalue=float(fillvalue)
+
+;data transformation
+data=(slope(0))*(data-intercept(0))
+fillvalue=(slope(0))*(fillvalue-intercept(0))
+
+;get max and min value of data
+idx=where(data ne fillvalue(0), cnt)
+if cnt gt 0 then datamin=min(data[idx])
+if cnt gt 0 then datamax=max(data[idx])
+
+; Process fillvalue, convert data that are equal to fillvalue to NaN
+idx=where(data eq fillvalue(0),cnt)
+;if cnt gt 0 then data[idx]=!Values.F_NAN
+
+; The file contains SINSOID projection. We need to use eosdump to generate 1D lat and lon
+; For information on how to obtain the lat/lon data, check this URL http://hdfeos.org/zoo/note_non_geographic.php
+
+; Retrieve dimension size of data
+dimsize=size(data,/dim)
+numlat=dimsize(0)
+numlon=dimsize(1)
+
+openr,1,'lat_MOD43B4.A2006353.h15v15.004.2007006030047.output'
+size=numlat*numlon
+ValInlat=FltArr(size)
+READF,1,ValInlat
+
+lat=FINDGEN(numlat,numlon)
+lat=Reform(ValInlat,numlat,numlon)
+
+openr,2,'lon_MOD43B4.A2006353.h15v15.004.2007006030047.output'
+ValInlon=FltArr(size)
+READF,2,ValInlon
+
+lon=FINDGEN(numlat,numlon)
+lon=Reform(ValInlon,numlat,numlon)
+
+;Get vertex value for lat and lon
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+;The following coding is prepared for colorbar. 
+;If you require colorbar in your plot, you could download Dr. Fanning's Coyote Library from (http://www.dfanning.com/documents/programs.html). 
+;Make a directory named coyote somewhere on your machine, and extract the Coyote files into it. 
+;If color bar is not not necessary for your plot, you can ignore this step and add comment character ';' ahead of coding. 
+;Add the coyote directory you create on your machine to your IDL path. !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+!PATH=Expand_Path('+/mnt/hdf/ziying-li/coyote/')+':'+!PATH
+
+; Start off generating the plot
+levels=254
+device,decomposed=0
+LoadCT,33, Ncolors=levels, Bottom=1
+WINDOW, Title='Nadir_Reflectance at Num_Land_Bands=5'+'  '+'units:'+units
+MAP_SET, /SINUSOIDAL, /CONTINENTS, XMARGIN=5, YMARGIN=5, LIMIT=[latmin, lonmin, latmax, lonmax], POSITION=[0.05, 0.05, 0.82, 0.95]
+CONTOUR, data, lon, lat, /OVERPLOT, /FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+;The following coding is to generate color bar if your already download and install Dr. Fanning's Coyote Library and add the coyote directory above. 
+;If you don't need color bar in your plot, you can ignore this step and add comment character ';' ahead of coding.
+;Because of the limitation of this routine, the color bar can not display properly in this case.
+COLORBAR, Range=[datamin, datamax], Ncolors=levels, /Vertical, Position=[0.94,0.1,0.96,0.9]
+
+
+
+
+
+

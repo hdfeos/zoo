@@ -1,0 +1,125 @@
+;
+;  This example code illustrates how to access and visualize LaRC CATS 
+; Level 2 Swath Version 2.01 HDF5 file in IDL. 
+;
+;  If you have any questions, suggestions, comments on this example, please use
+; the HDF-EOS Forum (http://hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org or 
+; post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage: compile first and then run CATS since it involves nested for loops.
+; 
+; $idl
+; IDL>.compile
+; CATS-ISS_L2O_D-M7.2-V2-01_05kmLay.2017-05-01T00-47-40T01-28-41UTC.hdf5.v.idl
+; IDL> CATS
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2018-06-21
+
+PRO CATS
+; Open file.
+file_name='CATS-ISS_L2O_D-M7.2-V2-01_05kmLay.2017-05-01T00-47-40T01-28-41UTC.hdf5'
+file_id = H5F_OPEN(file_name)
+
+; Read data.
+datafield_name='/layer_descriptor/Aerosol_Type_Fore_FOV'
+data_id=H5D_OPEN(file_id,datafield_name)
+data_raw=H5D_READ(data_id)
+
+; Close dataset.
+H5D_CLOSE, data_id
+
+; Read latitude.
+latitude_name='/geolocation/CATS_Fore_FOV_Latitude'
+latitude_id=H5D_OPEN(file_id, latitude_name)
+lat=H5D_READ(latitude_id)
+
+; Close dataset.
+H5D_CLOSE, latitude_id
+
+; Read base altitude.
+alt_name='/layer_descriptor/Layer_Base_Altitude_Fore_FOV'
+alt_id=H5D_OPEN(file_id, alt_name)
+base_altitude=H5D_READ(alt_id)
+
+; Close dataset.
+H5D_CLOSE, alt_id
+
+; Close file.
+H5F_CLOSE, file_id
+
+; Change 2 to 0 or 1 to check other location.
+lat = lat(2,*)
+
+; lat are 2-D, Nx1 array.
+lat = reform(lat)
+dim=size(data_raw,/dim)
+y_scale = 23
+alt = FINDGEN(y_scale, START=-2.0)
+inds = INTARR(size(base_altitude, /dim))
+
+; Regrid based on base_altitude.
+FOR i=0,dim(0)-1  DO BEGIN
+   FOR j=0,dim(1)-1 DO BEGIN
+      x = base_altitude(i,j)
+      ii = -999 
+      IF (x NE -999.99) THEN BEGIN
+         FOR nb=0,y_scale-2 DO BEGIN
+            IF (x GE alt(nb) AND x LE alt(nb+1)) THEN ii = nb
+         ENDFOR
+      ENDIF
+      inds[i,j] = ii                  
+   ENDFOR 
+ENDFOR
+
+data = INTARR(y_scale, dim(1))
+FOR i=0,dim(0)-1  DO BEGIN
+   FOR j=0,dim(1)-1 DO BEGIN
+      x = inds(i,j)
+      IF (x NE -999) THEN BEGIN
+         data(inds(i,j), j) = data_raw(i,j)
+      ENDIF
+   ENDFOR 
+ENDFOR
+
+longname = datafield_name
+; Define the custom discrete color table.
+levels = 9
+ct = COLORTABLE([[0, 150, 0,   255,  0,   255,  200, 100, 50, 200], $
+                 [0, 150, 0,   255,  255, 0,    100, 50,  25, 128], $
+                 [0, 150, 255, 0,    0,   0,    255, 255, 125, 200]], $
+                NCOLORS = levels, /TRANSPOSE)
+index = [0,1,2,3,4,5,6,7,8]
+
+; Generate the plot. RGB_INDICES is key for discrete colorbar.
+c1 = CONTOUR(ROTATE(data,1), lat, alt, $
+             /FILL, $
+             /BUFFER, $
+             RGB_INDICES=index, C_VALUE=index, $
+             N_LEVELS = levels, $
+             BACKGROUND_COLOR=[0,0,0], $
+             RGB_TABLE=ct, $
+             TITLE=file_name, $
+             FONT_SIZE = 10, $ ; File name is long. Reduce font size.
+             XTITLE='Latitude (degrees_north)', $
+             YTITLE='Altitude (km)', $             
+             POSITION=[0.1, 0.1, 0.82, 0.8])
+
+t1 = TEXT(0.35, 0.01, longname)
+
+; We need a custom discrete colorbar.
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[0,9], ORIENTATION=1, BORDER=1,$
+              TICKVALUES=[0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5], $
+              TICKNAME=['invalid', 'marine', 'p. marine ', 'dust', $
+                        'dust mixture', 'clean/bg', 'p. continental', $
+                        'smoke', 'volcanic'], $
+              TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.v.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+END
+
+

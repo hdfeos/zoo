@@ -1,0 +1,114 @@
+;
+;  This example code illustrates how to access and visualize LAADS MODIS
+;  swath file in IDL. 
+;
+;  If you have any questions, suggestions, comments on this example, please 
+; use the HDF-EOS Forum (http://hdfeos.org/forums). 
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org 
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;                               
+; %idl MOD06_L2.A2010001.0000.005.2010005213214.hdf.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2017-11-21
+;
+; Open file.
+file_name='MOD06_L2.A2010001.0000.005.2010005213214.hdf'
+
+; Open swath.
+SWATH_NAME='mod06'
+file_id=EOS_SW_OPEN(FILE_NAME)
+swath_id=EOS_SW_ATTACH(file_id, SWATH_NAME)
+
+; Read data field.
+DATAFIELD_NAME='Effective_Radius_Difference'
+status=EOS_SW_READFIELD(swath_id,DATAFIELD_NAME,data)
+
+; Convert the 3D data to 2D data at Radius Difference=0
+data2D=data[*,*,0]
+
+; Close file.
+status=EOS_SW_DETACH(swath_id)
+status=EOS_SW_CLOSE(file_id)
+
+; Because dimension maps are used in the eos_file, we must use
+; geolocation values that are stored in a different file.
+FILE_NAME='MOD03.A2010001.0000.005.2010003235220.hdf'
+SWATH_NAME= 'MODIS_Swath_Type_GEO'
+file_id = EOS_SW_OPEN(FILE_NAME)
+swath_id=EOS_SW_ATTACH(file_id, SWATH_NAME)
+
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+
+status=EOS_SW_DETACH(swath_id)
+status=EOS_SW_CLOSE(file_id)
+
+; Retrieve attributes.
+FILE_NAME='MOD06_L2.A2010001.0000.005.2010005213214.hdf'
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+DATAFIELD_NAME='Effective_Radius_Difference'
+index=HDF_SD_NAMETOINDEX(newFileID, 'Effective_Radius_Difference')
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+fillvalue_index=HDF_SD_ATTRFIND(thisSdsID, '_FillValue')
+HDF_SD_ATTRINFO, thisSdsID, fillvalue_index, DATA=fillvalue
+fillvalue=float(fillvalue)
+
+long_name_index=HDF_SD_ATTRFIND(thisSdsID, 'long_name')
+HDF_SD_ATTRINFO, thisSdsID, long_name_index, DATA=long_name
+
+units_index=HDF_SD_ATTRFIND(thisSdsID, 'units')
+HDF_SD_ATTRINFO, thisSdsID, units_index, DATA=units
+
+scalefactor_index=HDF_SD_ATTRFIND(thisSdsID, 'scale_factor')
+HDF_SD_ATTRINFO, thisSdsID, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(thisSdsID, 'add_offset')
+HDF_SD_ATTRINFO, thisSdsID, offset_index, DATA=offset
+HDF_SD_END, newFileID
+
+; Convert data type.
+dataf=float(data2D)
+
+; Process fill values.
+idx=where(data2D eq fillvalue(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+dataf=(scale_factor(0))*(dataf-offset(0))
+
+c_lon = MEDIAN(lon)
+c_lat = MEDIAN(lat)
+
+m = MAP('Orthographic', TITLE=file_name+'$\n$'+ DATAFIELD_NAME + $
+        ' at Radius_Difference=0', FONT_SIZE=9, /BUFFER, $
+        CENTER_LONGITUDE = c_lon,  CENTER_LATITUDE = c_lat)
+; Use Rainbow 2 [1] color table because many data point values are
+; near middle range and colortable like CB-RdYiBu (72) will color them
+; as white, which is hard to see.
+ct = COLORTABLE(34)
+; Long name is very long. To find an ideal split position, print
+; content and length.
+; PRINT, long_name
+; len = strlen(long_name) 
+; PRINT, len  ; 261
+t1 = TEXT(0.01, 0.05, FONT_SIZE=9, STRMID(long_name, 0, 90))
+t2 = TEXT(0.01, 0.03, FONT_SIZE=9, STRMID(long_name, 90, 88))
+t3 = TEXT(0.01, 0.01, FONT_SIZE=9, STRMID(long_name, 178, 90))
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, $
+              POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+; [1] http://www.harrisgeospatial.com/docs/LoadingDefaultColorTables.html

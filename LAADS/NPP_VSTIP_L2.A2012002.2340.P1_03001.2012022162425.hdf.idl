@@ -1,0 +1,121 @@
+;
+;  This example code illustrates how to access and visualize LAADS NPP VIIRS
+; Swath file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Tested under: IDL 8.0
+; Last updated: 2012-10-11
+
+; Define file name, grid name, and data field.
+file_name='NPP_VSTIP_L2.A2012002.2340.P1_03001.2012022162425.hdf'
+swath_name='IceQuality_SurfaceTemp '
+datafield_name='SurfaceTemperature'
+
+; Open file.
+file_id = EOS_SW_OPEN(file_name)
+
+; Attach Grid.
+swath_id = EOS_SW_ATTACH(file_id, swath_name)
+
+; Retrieve data.
+status = EOS_SW_READFIELD(swath_id, datafield_name, data)
+
+; Retrieve lat/lon.
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+
+; Detach Grid.
+status = EOS_SW_DETACH(swath_id)
+
+; Close file
+status = EOS_SW_CLOSE(file_id)
+
+
+
+; Get min/max value of lat and lon for zoomed image.
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+; Convert data type.
+dataf=FLOAT(data)
+
+; Process fillvalue.
+idx=WHERE(data LT -999.0, cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; We could not get the data product specification that explains units,
+; etc.
+long_name = datafield_name
+units = 'unknown'
+
+; Generate a plot.
+levels = 254
+DEVICE, DECOMPOSED=0
+LOADCT, 33, NCOLORS=levels, BOTTOM=1
+WINDOW, TITLE = 'FIELD:' + long_name + '  ' + 'UNIT:' + units
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+  LIMIT=[latmin, lonmin, latmax, lonmax], POSITION=[0.05, 0.05, 0.82, 0.82]
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_COLORS=INDGEN(levels)+3, $
+  NLEVELS=levels
+MAP_GRID, /BOX_AXES
+MAP_CONTINENTS
+
+; Draw file name, field name, and unit.
+XYOUTS, 0.05, 0.86, /NORMAL, 'FIELD:' + long_name, $
+  CHARSIZE=1.25,  ALIGNMENT=0.0
+XYOUTS, 0.82, 0.86, /NORMAL, 'UNIT:' + units, $ 
+  CHARSIZE=1.25,  ALIGNMENT=1.0
+XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+  CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+;   If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+;   Add the coyote directory that you created on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+;   We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=Expand_Path('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need a color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+ POSITION=[0.9,0.05,0.94,0.8]
+
+; Write JPEG image file.
+im = TVRD(TRUE=3)
+jpg = file_name + '.idl.jpg'   
+WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+EXIT
+
+; Reference
+;
+; [1] http://hdfeos.org/zoo/note_non_geographic.php
+; [2] http://www.dfanning.com/documents/programs.html

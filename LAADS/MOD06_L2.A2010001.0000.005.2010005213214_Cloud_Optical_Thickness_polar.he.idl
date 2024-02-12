@@ -1,0 +1,165 @@
+;  This example code illustrates how to access and visualize LAADS
+;  MOD06 Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Define file name, swath name, and data field.
+file_name='MOD06_L2.A2010001.0000.005.2010005213214.hdf'
+swath_name='mod06'
+datafield_name='Cloud_Optical_Thickness'
+
+; Open file.
+file_id=EOS_SW_OPEN(file_name)
+
+; Attach Swath.
+swath_id=EOS_SW_ATTACH(file_id, swath_name)
+
+; Retrieve data.
+status=EOS_SW_READFIELD(swath_id,datafield_name,data)
+
+; Retrieve dimension info for title of the plot.
+status=EOS_SW_FIELDINFO(swath_id,datafield_name,rank,dims,numbertype,dimlist)
+
+; Detach Swath.
+status=EOS_SW_DETACH(swath_id)
+
+; Close file.
+status=EOS_SW_CLOSE(file_id)
+
+
+; Retrieve long_name, _FillValue, units, scale factor, and offset 
+; attributes. 
+file_id_hdf=HDF_SD_START(file_name, /READ)
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+valid_range_index=HDF_SD_ATTRFIND(sds_id, 'valid_range')
+HDF_SD_ATTRINFO, sds_id, valid_range_index, data=valid_range
+
+scalefactor_index=HDF_SD_ATTRFIND(sds_id, 'scale_factor')
+HDF_SD_ATTRINFO, sds_id, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(sds_id, 'add_offset')
+HDF_SD_ATTRINFO, sds_id, offset_index, data=offset
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+HDF_SD_ENDACCESS, sds_id
+HDF_SD_END, file_id_hdf
+
+
+; Since dimension maps are used in the MOD05 file, we must use
+; geolocation values that are stored in a secondary file.
+file_name_geo='MOD03.A2010001.0000.005.2010003235220.hdf'
+swath_name= 'MODIS_Swath_Type_GEO'
+file_id = EOS_SW_OPEN(file_name_geo)
+swath_id=EOS_SW_ATTACH(file_id, swath_name)
+
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+
+status=EOS_SW_DETACH(swath_id)
+status=EOS_SW_CLOSE(file_id)
+
+; Convert data type.
+dataf=float(data)
+
+; Process fillvalue.
+idx=WHERE(data EQ fillvalue(0), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Process valid_range.
+idx=WHERE(data LT valid_range(0) OR data GT valid_range(1), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Apply scale factor and offset according to the specification [1].
+dataf = scale_factor(0) * (dataf - offset(0)) 
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; Get min/max value of lat and lon for zoomed image.
+latmin=MIN(lat)
+latmax=MAX(lat)
+; We want to view the full circle around the South Pole.
+lonmin=-180
+lonmax=180
+
+; Prepare field name title using long name attribute.
+; Since long_name(0) is too long (> 122 characters), we use datafield_name.
+field = datafield_name
+
+; Generate a plot.
+levels = 254
+DEVICE, DECOMPOSED=0
+LOADCT, 33, NCOLORS=levels, BOTTOM=1
+
+; ISOTROPIC ensures a full circle map, not an ellipitical map.
+WINDOW, TITLE = 'FIELD:' + field + '  '+'UNIT:'+units
+MAP_SET, /STEREOGRAPHIC, /ISOTROPIC, -90, 0, $
+  /CONTINENTS, XMARGIN=5, YMARGIN=5, $
+  POSITION=[0.05, 0.05, 0.82, 0.82], LIMIT=[latmin, lonmin, latmax, lonmax]   
+CONTOUR, dataf, lon, lat, /OVERPLOT, /CELL_FILL, C_COLORS=INDGEN(levels)+3, $
+  NLEVELS=levels
+MAP_GRID, /LABEL
+MAP_CONTINENTS
+
+; Draw file name, field name, and unit.
+XYOUTS, 0.43, 0.86, /NORMAL, 'FIELD:' + field, $
+  CHARSIZE=1.25,  ALIGNMENT=0.5
+XYOUTS, 0.94, 0.86, /NORMAL, 'UNIT:' + units, $ 
+  CHARSIZE=1.25,  ALIGNMENT=1.0
+XYOUTS, 0.43, 0.92, /NORMAL, file_name, $
+  CHARSIZE=1.75,  ALIGNMENT=0.5
+
+; The following code is prepared for colorbar. 
+;
+;   If you want to have a color bar in your plot, please download 
+; "Dr. Fanning's Coyote Library" from [2]. Make a directory named
+; coyote somewhere on your machine, and extract the Coyote library files into
+; it. 
+;
+;   If color bar is not not necessary for your plot, you can ignore this
+; step and add comment character ';' at the beginning of the rest of codes.
+;
+;   Add the coyote directory that you created on your machine to your IDL
+;  path like below: 
+;
+; !PATH=Expand_Path('[coyote directory on your machine])+':'+!PATH
+
+;   We assume that the coyote library is installed under the current working
+; directory that this code exists.
+!PATH=EXPAND_PATH('+coyote/')+':'+!PATH
+
+;  The following code assumes that you've already download and installed 
+; "Dr. Fanning's Coyote Library" and add the coyote directory above. 
+;
+;  If you don't need a color bar in your plot, you can ignore this step
+;  by adding comment character ';' at the beginning of the code.
+COLORBAR, RANGE=[datamin, datamax], NCOLORS=levels, /VERTICAL, $
+ POSITION=[0.9,0.05,0.94,0.8]
+
+; Write JPEG image file.
+im = TVRD(TRUE=3)
+jpg = 'MOD06_L2.A2010001.0000.005.2010005213214_Cloud_Optical_Thickness_Polar.idl.JPG'
+WRITE_JPEG, jpg, im, QUALITY=100, TRUE=3
+
+; Reference
+;
+; [1] http://ladsweb.nascom.nasa.gov/filespecs/MOD05_L2.CDL.fs
+; [2] http://www.dfanning.com/documents/programs.html
+

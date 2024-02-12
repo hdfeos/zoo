@@ -1,0 +1,64 @@
+; Current file: AIRS.2002.12.31.001.L2.CC_H.v4.0.21.0.G06100185050topog.he.idl
+; 
+; Refer to: MOD06_L2.A2010001.0000.005.2010005213214.hdf
+;
+; DataField name: topog
+;
+; Units: N/A
+;
+; Author: Ziying Li
+;
+
+
+; IDL example for reading AIRS L2 Swath.
+;
+;
+FILE_NAME='AIRS.2002.12.31.001.L2.CC_H.v4.0.21.0.G06100185050.hdf'
+SWATH_NAME='L2_Standard_cloud-cleared_radiance_product'
+
+file_id=EOS_SW_OPEN(FILE_NAME)
+swath_id=EOS_SW_ATTACH(file_id, SWATH_NAME)
+
+DATAFIELD_NAME='topog'
+status=EOS_SW_READFIELD(swath_id,DATAFIELD_NAME,data)
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+
+
+status=EOS_SW_DETACH(swath_id)
+status=EOS_SW_CLOSE(file_id)
+
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+;process fillvalue
+fillvalue=0.00
+
+;get max and min value of data
+;idx=where(data ne fillvalue(0), cnt)
+;if cnt gt 0 then datamin=min(data[idx])
+;if cnt gt 0 then datamax=max(data[idx])
+
+datamin=min(data)
+datamax=max(data)
+
+idx=where(data eq fillvalue(0), cnt)
+if cnt gt 0 then data[idx] = !Values.F_NAN
+
+;incorporate Dr. Fan's coding
+!PATH=Expand_Path('+/mnt/hdf/ziying-li/coyote/')+':'+!PATH
+
+levels=254
+device,decomposed=0
+LoadCT,33, Ncolors=levels, Bottom=1
+WINDOW, Title='Topog'+'  '+'units:', XSIZE=800
+MAP_SET, /GRID, /CONTINENTS, XMARGIN=5, YMARGIN=5, LIMIT=[latmin, lonmin, latmax, lonmax], POSITION=[0.05, 0.05, 0.82, 0.95]
+CONTOUR, BYTSCL(data,/NAN), lon, lat, /OVERPLOT, /FILL, C_Colors=Indgen(levels)+3, Background=1, NLEVELS=levels, Color=Black
+MAP_GRID, /BOX_AXES, COLOR=255
+MAP_CONTINENTS, COLOR=255
+COLORBAR, Range=[datamin,datamax], Ncolors=levels, /Vertical, Position=[0.9,0.1,0.94,0.9]
+
+
+

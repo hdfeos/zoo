@@ -1,0 +1,87 @@
+;
+;  This example code illustrates how to access and visualize LaRC
+;  CERES ES4 NOAA20 HDF4 Grid file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl CER_ES4_NOAA20-FM6_Edition1_101109.202201.hdf.idl
+;
+; Tested under: IDL 8.8.3
+; Last updated: 2022-11-22
+
+; Open file.
+file_name='CER_ES4_NOAA20-FM6_Edition1_101109.202201.hdf'
+file_id_hdf=HDF_SD_START(file_name, /READ)
+
+; Read data.
+datafield_name='Longwave flux'
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+HDF_SD_GETDATA, sds_id, data
+
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+HDF_SD_ENDACCESS, sds_id
+
+; Retrieve latitude.
+datafield_name='Colatitude'
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+HDF_SD_GETDATA, sds_id, colat
+HDF_SD_ENDACCESS, sds_id
+
+; Retrieve longitude.
+datafield_name='Longitude'
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+HDF_SD_GETDATA, sds_id, lon
+HDF_SD_ENDACCESS, sds_id
+
+; Close file.
+HDF_SD_END, file_id_hdf
+
+; Convert data type.
+dataf=FLOAT(data)
+lon=FLOAT(lon)
+colat=FLOAT(colat)
+; Process fill value.
+idx=WHERE(data EQ fillvalue(0), cnt)
+if cnt gt 0 then dataf[idx]=!Values.F_NAN
+
+; Adjust lat/lon.
+lat=90-colat
+lon[WHERE(lon GT 180)] = lon[WHERE(lon GT 180)] - 360
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+
+; IRREGULAR must be used.
+c1 = CONTOUR(dataf, lon, lat, /FILL, /IRREGULAR, OVERPLOT=m, $
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, long_name)
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, $
+              TEXTPOS=1, POSITION=[0.85,0.3,0.87,0.7], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, WIDTH=800, HEIGHT=600
+EXIT
+
+
+

@@ -1,0 +1,100 @@
+;
+;  This example code illustrates how to access and visualize LaRC
+;  CERES SSF NOAA20 FM6 VIIRS L2 netCDF-4/HDF5 file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  %idl CER_SSF_NOAA20-FM6-VIIRS_Edition1B_100102.2022080123.nc.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2022-10-25
+
+; Open file. 
+FILE_NAME='CER_SSF_NOAA20-FM6-VIIRS_Edition1B_100102.2022080123.nc'
+
+file_id=H5F_OPEN(FILE_NAME)
+
+; Define data field.
+DATAFIELD_NAME='/TOA_and_Surface_Fluxes/toa_incoming_solar_radiation'
+data_id=H5D_OPEN(file_id, DATAFIELD_NAME)
+data=H5D_READ(data_id)
+
+; Get 'units' attribute.
+units_id=H5A_OPEN_NAME(data_id, 'units')
+units=H5A_READ(units_id)
+H5A_CLOSE, units_id
+
+; Get 'long_name' attribute.
+longname_id=H5A_OPEN_NAME(data_id, 'long_name')
+long_name=H5A_READ(longname_id)
+H5A_CLOSE, longname_id
+
+; Get '_FillValue' attribute.
+fv_id=H5A_OPEN_NAME(data_id, '_FillValue')
+fv=H5A_READ(fv_id)
+H5A_CLOSE, fv_id
+
+; Close dataset.
+H5D_CLOSE, data_id
+
+; Retrieve lat/lon.
+lat_name='/Time_and_Position/instrument_fov_latitude'
+lat_id=H5D_OPEN(file_id, lat_name)
+lat=H5D_READ(lat_id)
+H5D_CLOSE, lat_id
+
+lon_name='/Time_and_Position/instrument_fov_longitude'
+lon_id=H5D_OPEN(file_id, lon_name)
+lon=H5D_READ(lon_id)
+H5D_CLOSE, lon_id
+
+; Close file.
+H5F_CLOSE, file_id
+
+; Process missing value, convert data that are equal to missingvaluef to NaN
+;dataf = FLOAT(data)
+idx = where(data eq fv(0), cnt)
+if cnt gt 0 then data[idx] = !Values.F_NAN
+
+; Lon starts from 0. Shift. 
+lon = ((lon + 180) MOD 360) - 180
+
+; Pick only valid points. Otherwise, scatter plot will be wrong.
+gidx = WHERE(FINITE(data), count)
+lats = lat[gidx]
+lons = lon[gidx]
+datas = data[gidx]
+datamin = MIN(datas)
+datamax = MAX(datas)
+
+i = WHERE(datas EQ MAX(datas))
+lat_c = lats[i]
+lon_c = lons[i]
+
+; Generate the plot.
+m = MAP('Orthographic', TITLE=file_name, FONT_SIZE=9, /BUFFER, $
+        CENTER_LONGITUDE = lon_c,  CENTER_LATITUDE = lat_c)
+
+ct = COLORTABLE(72, /reverse)
+c1 = SCATTERPLOT(lons, lats, OVERPLOT=m, $
+                 MAGNITUDE=datas, $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, long_name)
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], ORIENTATION=1, BORDER=1,$
+              TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+; Save image.
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+

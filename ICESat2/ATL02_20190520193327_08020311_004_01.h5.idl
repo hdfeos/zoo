@@ -1,0 +1,107 @@
+;
+;  This example code illustrates how to access and visualize NSIDC ICESat-2 
+; ATL02 L1B version 4 HDF5 file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl ATL02_20190520193327_08020311_004_01.h5.idl
+;
+; Tested under: IDL 8.6.0
+; Last updated: 2021-05-05
+
+; Open file.
+file_name = 'ATL02_20190520193327_08020311_004_01.h5'
+file_id = H5F_OPEN(file_name)
+
+; Read data.
+dset_name = '/atlas/pce1/background/bg_cnt_50shot_s'
+data_id = H5D_OPEN(file_id, dset_name)
+data = H5D_READ(data_id)
+
+time_name = '/atlas/pce1/background/delta_time'
+time_id = H5D_OPEN(file_id, time_name)
+time = H5D_READ(time_id)
+
+; dataspace_id=H5D_GET_SPACE(data_id)
+; dims=H5S_GET_SIMPLE_EXTENT_DIMS(dataspace_id)
+
+; Read latitude.
+latitude_name = '/gpsr/navigation/latitude'
+latitude_id = H5D_OPEN(file_id, latitude_name)
+lat = H5D_READ(latitude_id)
+
+; Read longitude.
+lon_name = '/gpsr/navigation/longitude'
+lon_id = H5D_OPEN(file_id, lon_name)
+lon = H5D_READ(lon_id)
+
+; Read attributes.
+long_name_id=H5A_OPEN_NAME(data_id, 'long_name')
+long_name=H5A_READ(long_name_id)
+H5A_Close, long_name_id
+
+units_id=H5A_OPEN_NAME(data_id, 'units')
+units=H5A_READ(units_id)
+H5A_CLOSE, units_id
+
+
+; Close handles.
+H5D_CLOSE, time_id
+H5D_CLOSE, data_id
+H5D_CLOSE, latitude_id
+H5D_CLOSE, lon_id
+
+; Set time's unit.
+start_time = JULDAY(1,1,2018, 0, 0, 0)
+
+; Compute the date/time.
+sec = time(0) / 86400
+t = start_time + sec
+
+; Create a string out of date/time.
+CALDAT, t, Mo, D, Y, H, Mi, S
+tstring = STRING(Y, FORMAT='(I4)') + '-' + STRING(Mo, FORMAT='(I2.2)') + $
+  '-' + STRING(D, FORMAT='(I2.2)') + ' ' + STRING(H, FORMAT='(I2.2)') $ 
+  + ':' + STRING(Mi, FORMAT='(I2.2)') + ':' + STRING(S, FORMAT='(I2.2)')  
+
+; Create X axis label.
+x_label = 'Seconds from ' + tstring
+
+; Create Y axis label.
+y_label = units
+
+; Create title label.
+t_label = file_name + '!C'+ long_name + '!C' + dset_name
+
+; Create an elapsed time variable.
+time_e = time - time(0)
+
+; Generate the multiple plots.
+ct = COLORTABLE(72, /reverse)
+; Draw a line plot.
+p1 = PLOT(time_e, data, YTITLE=y_label, XTITLE=x_label, TITLE=t_label, $
+          COLOR='blue', "o", /SYM_FILLED, SYM_SIZE=0.5, $
+          XTICKFONT_SIZE=8, YTICKFONT_SIZE=8, LAYOUT=[1,2,1], /BUFFER)
+
+m = MAP('Orthographic', TITLE='Trajectory of Flight Path', FONT_SIZE=9, $
+        LAYOUT=[1,2,2], $
+        /BUFFER, $
+        CENTER_LONGITUDE = lon[0],  CENTER_LATITUDE = lat[0], /CURRENT)
+c1 = SCATTERPLOT(lon, lat, OVERPLOT=m, $
+                 SYM_COLOR='blue', $
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.3, $
+                 POSITION=[0.0, 0.0, 0.9, 0.5])                 
+c2 = SCATTERPLOT(lon(0), lat(0), OVERPLOT=m, $
+                 SYM_COLOR='red', SYMBOL='+', SYM_SIZE=1, SYM_THICK=3.0)
+mc = MAPCONTINENTS()
+png = file_name + '.idl.png'
+p1.save, png, HEIGHT=1200, WIDTH=800
+EXIT

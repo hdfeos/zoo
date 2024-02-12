@@ -1,0 +1,144 @@
+;
+;  This example code illustrates how to access and visualize 
+;  LP DAAC MCD43A3 v6 HDF-EOS2 Grid file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+; 
+; Usage:
+;                               
+; $idl MCD43A3.A2020001.h28v05.006.2020010213609.pscs_000501613577.hdf.idl
+;
+; Tested under: IDL 8.7.2
+; Last updated: 2021-07-06
+
+; Define file name, swath name, and data field.
+file_name='MCD43A3.A2020001.h28v05.006.2020010213609.pscs_000501613577.hdf'
+grid_name='MOD_Grid_BRDF'
+
+; You can change datafield name.
+datafield_name='Albedo_BSA_shortwave'
+
+; Open file.
+file_id=EOS_GD_OPEN(file_name)
+
+; Attach Swath.
+grid_id=EOS_GD_ATTACH(file_id, grid_name)
+
+; Retrieve data.
+status=EOS_GD_READFIELD(grid_id, datafield_name, data)
+
+; Read metadata for lat/lon calculation.
+status = EOS_GD_GRIDINFO(grid_id, xdimsize, ydimsize, upleft, lowright)
+status = EOS_GD_PIXREGINFO(grid_id, pixregcode)
+
+; Detach Swath.
+status=EOS_GD_DETACH(grid_id)
+
+; Close file.
+status=EOS_GD_CLOSE(file_id)
+
+
+; Retrieve long_name, _FillValue, units, scale factor, and offset 
+; attributes. 
+file_id_hdf=HDF_SD_START(file_name, /READ)
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+valid_range_index=HDF_SD_ATTRFIND(sds_id, 'valid_range')
+HDF_SD_ATTRINFO, sds_id, valid_range_index, data=valid_range
+
+scalefactor_index=HDF_SD_ATTRFIND(sds_id, 'scale_factor')
+HDF_SD_ATTRINFO, sds_id, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(sds_id, 'add_offset')
+HDF_SD_ATTRINFO, sds_id, offset_index, data=offset
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+HDF_SD_ENDACCESS, sds_id
+HDF_SD_END, file_id_hdf
+
+; Convert data type.
+dataf=float(data)
+
+; Process fillvalue.
+idx=WHERE(data EQ fillvalue(0), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Process valid_range.
+idx=WHERE(data LT valid_range(0) OR data GT valid_range(1), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Apply scale factor and offset.
+dataf = scale_factor(0) * (dataf - offset(0))
+
+; Calcluate lat/lon.
+;
+; We assume that HDFE_CENTER is 0 by default. See GDdefpixreg() in 
+; "HDF-EOS Library Users Guide for the ECS Project Volume 2: Function
+; Reference Guide".
+IF (pixregcode EQ 1) THEN PRINT, 'ERROR:Pixel is not centered.' 
+IF (pixregcode EQ 1) THEN EXIT
+
+; Pixel must be centered.
+offsetX = 0.5
+offsetY = 0.5
+
+; Calculate lat/lon.
+lowright_d = floor(lowright)
+upleft_d = floor(upleft)
+dd = lowright_d-upleft_d
+lat_limit = dd(1)
+lon_limit = dd(0)
+
+scaleX = lon_limit/float(xdimsize)
+scaleY = lat_limit/float(ydimsize)
+
+lon_value= FINDGEN(xdimsize)
+lat_value= FINDGEN(ydimsize)
+for i=0,xdimsize-1 do lon_value(i) = (i+offsetX)*(scaleX) + upleft_d(0);
+for j=0,ydimsize-1 do lat_value(j) = (j+offsetX)*(scaleY) + upleft_d(1);
+
+lon = float(lon_value) / 100000.0
+lat = float(lat_value) / 100000.0
+
+; Get min/max value of lat and lon for zoomed image.
+latmin=MIN(lat)
+latmax=MAX(lat)
+lonmin=MIN(lon)
+lonmax=MAX(lon)
+
+; Get max and min value of data.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; Use LIMIT for zoom-in effect.
+m = MAP('Sinusoidal', TITLE=file_name, FONT_SIZE=9, /BUFFER, $
+        LIMIT=[latmin, lonmin, latmax, lonmax])
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, datafield_name)
+c1 = CONTOUR(dataf, lon, lat, $
+             /FILL, OVERPLOT=m, RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+
+
+
