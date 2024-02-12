@@ -60,6 +60,7 @@ jobs:
           install.packages('ggmap')
           install.packages('akima')
           install.packages('reshape')
+          install.packages('raster')          
           remotes::install_deps(dependencies = TRUE)
         shell: Rscript {0}
       - name: Generate data
