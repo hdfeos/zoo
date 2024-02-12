@@ -15,10 +15,11 @@
 #
 # Tested under: R 3.3.1
 # Last updated: 2024-02-12
+library(RNetCDF)
 library(fields)
 library(maps)
 # library(maptools)
-library(ncdf4)
+# library(ncdf4)
 library(raster)
 library(ggmap)
 library(akima)
@@ -27,7 +28,7 @@ data(wrld_simpl)
 
 # Open file.
 fname <- 'AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf'
-nc <- nc_open(fname)
+nc <- open.nc(fname)
 v1 <- nc$var[['topog']]
 z_all <- ncvar_get(nc, v1)
 zv <- as.vector(as.single(z_all))
@@ -65,4 +66,4 @@ axis.title.y = element_text(size = 20, vjust = 0.2),
 legend.text = element_text(size = 10)) +
 coord_map("stereographic", orientation=c(90, 0,0), ylim=c(90, 60))
 dev.off()
-nc_close(nc)
+close.nc(nc)
