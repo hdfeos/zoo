@@ -63,6 +63,9 @@ jobs:
           install.packages('raster')          
           remotes::install_deps(dependencies = TRUE)
         shell: Rscript {0}
+      - name: Get data
+        run: |
+          wget https://gamma.hdfgroup.org/ftp/pub/outgoing/NASAHDF/AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf
       - name: Generate data
         run: |
           source("GESDISC/AIRS.2002.08.30.227.L2.RetStd_H.v6.0.12.0.G14101125810.hdf.r")
