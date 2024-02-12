@@ -59,7 +59,8 @@ jobs:
           install.packages('mapproj')
           install.packages('ggmap')
           install.packages('akima')
-          install.packages('reshape')          
+          install.packages('reshape')
+          install.packages('ncdf4')
           remotes::install_deps(dependencies = TRUE)
         shell: Rscript {0}
       - name: Generate data
