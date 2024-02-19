@@ -15,7 +15,7 @@
 ;  $idl AIRS.2024.01.19.L3.RetStd_IR001.v7.0.7.0.G24022205217.hdf.idl
 ;
 ; Tested under: IDL 8.9.0
-; Last updated: 2024-01-31
+; Last updated: 2024-02-19
 
 ; Open file.
 file_name='AIRS.2024.01.19.L3.RetStd_IR001.v7.0.7.0.G24022205217.hdf'
@@ -74,7 +74,7 @@ datamax = MAX(dataf, /NAN)
 m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
 ct = COLORTABLE(72, /reverse)
 
-t1 = TEXT(0.35, 0.01, datafield_name+' at StdPrsLvls=0' + ' on '+day)
+t1 = TEXT(0.35, 0.01, datafield_name+' at StdPressureLev=0' + ' on '+day)
 c1 = CONTOUR(dataf, lon, lat, /FILL, /BUFFER, OVERPLOT=m, $
              RGB_TABLE=ct, $
              GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])

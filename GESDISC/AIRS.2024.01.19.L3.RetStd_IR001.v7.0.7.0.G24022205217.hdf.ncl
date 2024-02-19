@@ -15,7 +15,7 @@
 ; $ncl AIRS.2024.01.19.L3.RetStd_IR001.v7.0.7.0.G24022205217.hdf.ncl
 ;
 ; Tested under: NCL 6.6.2
-; Last updated: 2024-01-30
+; Last updated: 2024-02-19
 
 begin
 
@@ -25,7 +25,7 @@ begin
 ; For more information, consult section 4.3.2 of [2].
   eos_file=addfile(file_name+".he2", "r") ; Read file.
 
-; print(eos_file)
+;  print(eos_file)
 
 ; Read specific subset of data field.
   data=eos_file->Temperature_A_ascending(0, :,:)
@@ -33,7 +33,7 @@ begin
   d = tostring(eos_file@Year_location) + "-"
   d = d + tostring(eos_file@Month_location) + "-"
   d = d + tostring(eos_file@Day_location)
-  data@long_name = data@hdfeos_name + " at StdPrsLvls=0" + " on " + d
+  data@long_name = data@hdfeos_name + " at StdPressureLev=0" + " on " + d
   
   xwks=gsn_open_wks("png", file_name+".ncl")
   res=True 

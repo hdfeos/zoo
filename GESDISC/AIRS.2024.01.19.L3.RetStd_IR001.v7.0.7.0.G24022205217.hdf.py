@@ -15,8 +15,8 @@ Usage:  save this script and run
 
 The HDF file must be in your current working directory.
 
-Tested under: Python 3.9.1 :: Miniconda
-Last updated: 2024-01-31
+Tested under: Python 3.9.13 :: Miniconda
+Last updated: 2024-02-19
 """
 
 import os
@@ -93,10 +93,10 @@ m.drawparallels(np.arange(-90, 90, 30), labels=[1, 0, 0, 0])
 m.drawmeridians(np.arange(-180, 180, 30), labels=[0, 0, 0, 1])
 m.pcolormesh(longitude, latitude, data, latlon=True, alpha=0.90)
 cb = m.colorbar()
-cb.set_label("Unit:K")
+cb.set_label("K")
 basename = os.path.basename(FILE_NAME)
 plt.title(
-    "{0}\n {1} at StdPrsLvls=0 on {2}".format(basename, DATAFIELD_NAME, date)
+    "{0}\n {1} at StdPressureLev=0 on {2}".format(basename, DATAFIELD_NAME, date)
 )
 fig = plt.gcf()
 pngfile = "{0}.py.png".format(basename)
