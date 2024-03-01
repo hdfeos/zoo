@@ -1,0 +1,82 @@
+;
+;  This example code illustrates how to access and visualize ICESat-2
+; ATL03 L2A version 4 HDF5 file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Usage:
+;
+;  $idl ATL03_20181027235521_04480111_006_02.h5.idl
+;
+; Tested under: IDL 8.9.0
+; Last updated: 2024-03-01
+
+; Open file.
+file_name='ATL03_20181027235521_04480111_006_02.h5'
+file_id=H5F_OPEN(file_name)
+
+; Read latitude.
+latitude_name='/gt1l/geolocation/reference_photon_lat'
+latitude_id=H5D_OPEN(file_id, latitude_name)
+lat=H5D_READ(latitude_id)
+
+; Close dataset.
+H5D_CLOSE, latitude_id
+
+; Read longitude.
+lon_name='/gt1l/geolocation/reference_photon_lon'
+lon_id=H5D_OPEN(file_id, lon_name)
+lon=H5D_READ(lon_id)
+
+; Close dataset.
+H5D_CLOSE, lon_id
+
+
+; Read temperature.
+temp_name='/gt1l/geolocation/tx_pulse_energy'
+temp_id=H5D_OPEN(file_id, temp_name)
+temp=H5D_READ(temp_id)
+
+; Read unit attribute.
+units_temp_id=H5A_OPEN_NAME(temp_id, 'units')
+units_temp=H5A_READ(units_temp_id)
+H5A_CLOSE, units_temp_id
+
+; Read long name attribute.
+ln_temp_id=H5A_OPEN_NAME(temp_id, 'long_name')
+long_name_temp=H5A_READ(ln_temp_id)
+H5A_CLOSE, ln_temp_id
+
+
+; Close dataset.
+H5D_CLOSE, temp_id
+
+
+; Close file.
+H5F_CLOSE, file_id
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.35, 0.01, long_name_temp)
+datamin=MIN(temp)
+datamax=MAX(temp)
+c1 = SCATTERPLOT(lon, lat, OVERPLOT=m, $
+                 MAGNITUDE = temp, $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+
+; We need custom colorbar because we use SCATTERPLOT().
+; We cannot use TARGET=c1.
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units_temp)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
