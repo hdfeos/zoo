@@ -101,7 +101,7 @@ plt.gca().invert_yaxis()
 plt.gca().set_yscale("log")
 
 fig = plt.gcf()
-pngfile = "{0}.py.v.png".format(basename)
+pngfile = "{0}.v.py.png".format(basename)
 fig.savefig(pngfile)
 
 # Reference
