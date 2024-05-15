@@ -1,0 +1,94 @@
+;
+;  This example code illustrates how to access and visualize
+;  PO.DAAC SWOT L2 netCDF-4 file in IDL.
+;
+; If you have any questions, suggestions, comments  on this example,
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+;  $idl SWOT_GPR_2PfP009_584_20240124_232805_20240125_001932.nc.idl
+;
+; Tested under: IDL 8.9.0
+; Last updated: 2024-05-15
+
+; Open file. 
+file_name='SWOT_GPR_2PfP009_584_20240124_232805_20240125_001932.nc'
+file_id=NCDF_OPEN(file_name)
+parentId = NCDF_GROUPSINQ(file_id)
+; PRINT, NCDF_GROUPNAME(parentId[0])
+gid = parentId[0]
+; Read data.
+datafield_name='mean_dynamic_topography'
+data_id=NCDF_VARID(gid, datafield_name)
+
+; Retrieve data.
+NCDF_VARGET, gid, data_id, data
+
+; Get long_name.
+NCDF_ATTGET, gid, data_id, 'long_name', long_name
+
+; Get units.
+NCDF_ATTGET, gid, data_id, 'units', units
+
+; Get _FillValue.
+NCDF_ATTGET, gid, data_id, '_FillValue', fillvalue
+
+; Get scale.
+NCDF_ATTGET, gid, data_id, 'scale_factor', scale
+
+; Read latitude.
+latitude_name='latitude'
+latitude_id=NCDF_VARID(gid, latitude_name)
+NCDF_VARGET, gid, latitude_id, lat
+
+; Get scale.
+NCDF_ATTGET, gid, latitude_id, 'scale_factor', scale_lat
+
+; Read longitude.
+lon_name='longitude'
+longitude_id=NCDF_VARID(gid, lon_name)
+NCDF_VARGET, gid, longitude_id, lon
+
+; Get scale.
+NCDF_ATTGET, gid, longitude_id, 'scale_factor', scale_lon
+
+; Close file.
+NCDF_CLOSE, file_id
+
+; Convert type to double.
+dataf = float(data)
+
+; Process scale/offset.
+dataf = scale * dataf
+
+; Process fill value.
+dataf[WHERE(data EQ fillvalue(0))] = !Values.F_NAN
+idx = WHERE(data NE fillvalue(0))
+lat = scale_lat * lat
+lon = scale_lon * lon
+lon = ((lon + 180) MOD 360) - 180
+
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+c1 = SCATTERPLOT(lon[idx], lat[idx], OVERPLOT=m, $
+                 MAGNITUDE=dataf[idx], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, STRING([long_name]))
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], ORIENTATION=1, BORDER=1,$
+              TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=STRING([units]))
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
