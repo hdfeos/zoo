@@ -15,8 +15,8 @@
 ; 
 ; $ncl MOD08_D3.A2010001.061.2017308151839.hdf.ncl
 ;
-; Tested under: NCL 6.4.0
-; Last updated: 2018-02-16
+; Tested under: NCL 6.6.2
+; Last updated: 2024-05-31
 
 load "$NCARG_ROOT/lib/ncarg/nclex/gsun/gsn_code.ncl"
 load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_csm.ncl"
