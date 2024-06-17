@@ -1,0 +1,137 @@
+;
+;   This example code illustrates how to access and visualize LAADS
+; MOD05 Swath file in IDL. 
+;
+;   If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;   If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+; 
+; Usage:
+;                               
+; $idl MOD06_L2.A2010001.0000.061.2017308133515.hdf.idl
+;
+; Tested under: IDL 8.9.0
+; Last updated: 2024-06-17
+
+; Define file name, swath name, and data field.
+file_name='MOD06_L2.A2010001.0000.061.2017308133515.hdf'
+swath_name='mod06'
+datafield_name='Cloud_Optical_Thickness'
+
+; Open file.
+file_id=EOS_SW_OPEN(file_name)
+
+; Attach Swath.
+swath_id=EOS_SW_ATTACH(file_id, swath_name)
+
+; Retrieve data.
+status=EOS_SW_READFIELD(swath_id, datafield_name, data)
+
+; Retrieve dimension info for title of the plot.
+;status=EOS_SW_FIELDINFO(swath_id, datafield_name, rank, dims, ntype, dimlist)
+
+; Detach Swath.
+status=EOS_SW_DETACH(swath_id)
+
+; Close file.
+status=EOS_SW_CLOSE(file_id)
+
+; Retrieve attributes.
+file_id_hdf=HDF_SD_START(file_name, /READ)
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id=HDF_SD_SELECT(file_id_hdf, index)
+
+fillvalue_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, data=fillvalue
+
+long_name_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, long_name_index, DATA=long_name
+
+valid_range_index=HDF_SD_ATTRFIND(sds_id, 'valid_range')
+HDF_SD_ATTRINFO, sds_id, valid_range_index, data=valid_range
+
+scalefactor_index=HDF_SD_ATTRFIND(sds_id, 'scale_factor')
+HDF_SD_ATTRINFO, sds_id, scalefactor_index, DATA=scale_factor
+
+offset_index=HDF_SD_ATTRFIND(sds_id, 'add_offset')
+HDF_SD_ATTRINFO, sds_id, offset_index, data=offset
+
+units_index=HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+
+HDF_SD_ENDACCESS, sds_id
+HDF_SD_END, file_id_hdf
+
+; Read lat/lon from Geo-location file.
+file_name_geo='MOD03.A2010001.0000.061.2017255193343.hdf'
+swath_name= 'MODIS_Swath_Type_GEO'
+file_id = EOS_SW_OPEN(file_name_geo)
+swath_id=EOS_SW_ATTACH(file_id, swath_name)
+
+status=EOS_SW_READFIELD(swath_id, 'Longitude', lon)
+status=EOS_SW_READFIELD(swath_id, 'Latitude', lat)
+
+status=EOS_SW_DETACH(swath_id)
+status=EOS_SW_CLOSE(file_id)
+
+; Convert data type.
+dataf=float(data)
+
+; Process fillvalue.
+idx=WHERE(data EQ fillvalue(0), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Process valid_range.
+idx=WHERE(data LT valid_range(0) OR data GT valid_range(1), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Apply scale factor and offset.
+dataf = scale_factor(0) * (dataf - offset(0)) 
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; Get min/max value of lat and lon for zoomed image.
+latmin=MIN(lat)
+latmax=MAX(lat)
+lonmin=MIN(lon)
+lonmax=MAX(lon)
+
+; Generate plot.
+c_lon = MEDIAN(lon)
+c_lat = MEDIAN(lat)
+
+; Pick only valid points for scatter plot.
+gidx = WHERE(FINITE(dataf), count)
+lats = lat[gidx]
+lons = lon[gidx]
+datas = dataf[gidx]
+datamin = MIN(datas)
+datamax = MAX(datas)
+
+m = MAP('Orthographic', TITLE=file_name, FONT_SIZE=9, /BUFFER, $
+        CENTER_LONGITUDE = c_lon,  CENTER_LATITUDE = c_lat, $
+        LIMIT=[latmin, lonmin, latmax, lonmax])
+ct = COLORTABLE(72, /reverse)
+; long_name value is too long.
+; Split the long string into 3 substrings. 
+t1 = TEXT(0.01, 0.15, FONT_SIZE=8, STRMID(long_name, 0, 81))
+t1 = TEXT(0.01, 0.125, FONT_SIZE=8, STRMID(long_name, 81, 72))
+t1 = TEXT(0.01, 0.1, FONT_SIZE=8, STRMID(long_name, 153, $
+                                         STRLEN(long_name)-153))
+c1 = SCATTERPLOT(lons[*], lats[*], OVERPLOT=m, $
+                 MAGNITUDE=datas[*], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], ORIENTATION=1, BORDER=1,$
+              TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
