@@ -11,7 +11,7 @@ contact us at eoshelp@hdfgroup.org or post it at the HDF-EOS Forum
 
 Usage: save this script and run
 
- $python OMI-Aura_L2-OMTO3_2005m0321t0122-o03623_v003-2012m0330t192822.he5.py
+ $python OMI-Aura_L2-OMTO3_2005m0621t0014-o04962_v003-2012m0330t195928.he5.py
 
 The HDF file must be in your current working directory.
 
@@ -27,7 +27,7 @@ import numpy as np
 
 import h5py
 
-FILE_NAME = "OMI-Aura_L2-OMTO3_2005m0321t0122-o03623_v003-2012m0330t192822.he5"
+FILE_NAME = "OMI-Aura_L2-OMTO3_2005m0621t0014-o04962_v003-2012m0330t195928.he5"
 path = "/HDFEOS/SWATHS/OMI Column Amount O3/Data Fields/"
 DATAFIELD_NAME = path + "ColumnAmountO3"
 with h5py.File(FILE_NAME, mode="r") as f:
@@ -55,26 +55,37 @@ with h5py.File(FILE_NAME, mode="r") as f:
     datam = np.ma.masked_where(np.isnan(data), data)
 
     # Find middle location for center of map.
-    lat_m = latitude[int(latitude.shape[0] / 2), int(latitude.shape[1] / 2)]
-    lon_m = longitude[int(longitude.shape[0] / 2), int(longitude.shape[1] / 2)]
+    # lat_m = np.nanmean(latitude)
+    # lon_m = np.nanmean(longitude)
+
+    # Or use North Pole.
+    lat_m = 90
+    lon_m = 0
 
     # Use ortho projection.
     orth = ccrs.Orthographic(
         central_longitude=lon_m, central_latitude=lat_m, globe=None
     )
     ax = plt.axes(projection=orth)
+
     # Remove the following to see zoom-in view.
     ax.set_global()
+
     p = plt.pcolormesh(
-        longitude, latitude, datam, shading="auto", transform=ccrs.PlateCarree(),
-        vmin=50, vmax=500
+        longitude,
+        latitude,
+        datam,
+        shading="auto",
+        transform=ccrs.PlateCarree(),
+        vmin=50,
+        vmax=500
     )
 
     # Gridline with draw_labels=True doesn't work on ortho.
     # ax.gridlines(draw_labels=True)
     ax.gridlines()
     ax.coastlines()
-    cb = plt.colorbar(p, extend="both")
+    cb = plt.colorbar(p, fraction=0.02, pad=0.02, extend="both")
     cb.set_label(units)
 
     basename = os.path.basename(FILE_NAME)

@@ -70,14 +70,15 @@ with h5py.File(FILE_NAME, mode="r") as f:
     # Remove the following to see zoom-in view.
     ax.set_global()
     p = plt.pcolormesh(
-        longitude, latitude, datam, shading="auto", transform=ccrs.PlateCarree()
+        longitude, latitude, datam, shading="auto", transform=ccrs.PlateCarree(),
+        vmin=50, vmax=500        
     )
 
     # Gridline with draw_labels=True doesn't work on ortho.
     # ax.gridlines(draw_labels=True)
     ax.gridlines()
     ax.coastlines()
-    cb = plt.colorbar(p)
+    cb = plt.colorbar(p, extend="both")
     cb.set_label(units)
 
     basename = os.path.basename(FILE_NAME)
