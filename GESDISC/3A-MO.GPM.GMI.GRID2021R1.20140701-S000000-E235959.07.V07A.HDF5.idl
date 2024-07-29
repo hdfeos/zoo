@@ -1,0 +1,73 @@
+;
+;  This example code illustrates how to access and visualize GPM L3 file
+; in IDL.
+;
+;  If you have any questions, suggestions, comments on this example, please 
+; use the HDF-EOS Forum (http://hdfeos.org/forums). 
+; 
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS data 
+; product that is not listed in the HDF-EOS Comprehensive Examples page 
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org 
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;                               
+; $idl 3A-MO.GPM.GMI.GRID2021R1.20140701-S000000-E235959.07.V07A.HDF5.idl
+;
+; Tested under: IDL 8.9.0
+; Last updated: 2024-07-29
+
+; Open file.
+file_name = '3A-MO.GPM.GMI.GRID2021R1.20140701-S000000-E235959.07.V07A.HDF5'
+file_id = H5F_OPEN(file_name)
+
+; Retrieve data.
+datafield_name = '/Grid/cloudWater'
+data_id = H5D_OPEN(file_id, datafield_name)
+data = H5D_READ(data_id)
+dataf = TRANSPOSE(data(*,*,0))
+
+; Get '_FillValue' attribute.
+fv_id = H5A_OPEN_NAME(data_id, '_FillValue')
+fv = H5A_READ(fv_id)
+H5A_CLOSE, fv_id
+
+; Get 'units' attribute.
+units_id = H5A_OPEN_NAME(data_id, 'units')
+units = H5A_READ(units_id)
+H5A_CLOSE, units_id
+
+; Close dataset.
+H5D_CLOSE, data_id
+
+
+; Read lat/lon.
+lat_id = H5D_OPEN(file_id, '/Grid/lat')
+lat = H5D_READ(lat_id)
+H5D_CLOSE, lat_id
+
+lon_id = H5D_OPEN(file_id, '/Grid/lon')
+lon = H5D_READ(lon_id)
+H5D_CLOSE, lon_id
+
+; Close file.
+H5F_CLOSE, file_id
+
+
+; Process missing value, convert dataf that are equal to missingvaluef to NaN
+idx = where(dataf eq fv(0), cnt)
+if cnt gt 0 then dataf[idx] = !Values.F_NAN
+
+; Generate the plot.
+m = MAP('Geographic', TITLE=file_name, FONT_SIZE=9, /BUFFER)
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.35, 0.01, FONT_SIZE=8, datafield_name)
+c1 = CONTOUR(dataf, lon, lat, /FILL, OVERPLOT=m,$
+             RGB_TABLE=ct, $
+             GRID_UNITS='degrees', POSITION=[0.1, 0.1, 0.83, 0.9])
+mc = MAPCONTINENTS()
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1, $
+              POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
