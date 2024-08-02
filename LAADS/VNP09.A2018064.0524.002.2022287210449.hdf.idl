@@ -1,0 +1,140 @@
+;
+;  This example code illustrates how to access and visualize LAADS
+;  VNP09 v2 HDF-EOS2 Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+; 
+; Usage:
+;                               
+; $idl VNP09.A2018064.0524.002.2022287210449.hdf.idl
+;
+; Tested under: IDL 8.9.0
+; Last updated: 2024-08-01
+
+; Define file name, swath name, and data field.
+file_name='VNP09.A2018064.0524.002.2022287210449.hdf'
+swath_name='SurfReflect_VNP'
+
+; Select datafield name.
+datafield_name='375m Surface Reflectance Band I1'
+
+; Open file.
+file_id = EOS_SW_OPEN(file_name)
+
+; Attach Swath.
+swath_id = EOS_SW_ATTACH(file_id, swath_name)
+
+; Retrieve data.
+status = EOS_SW_READFIELD(swath_id,datafield_name,data)
+
+; Retrieve dimension info for title of the plot.
+status = EOS_SW_FIELDINFO(swath_id,datafield_name,rank,dims,numbertype,dimlist)
+
+; Retrieve attributes. 
+file_id_hdf = HDF_SD_START(file_name, /READ)
+index = HDF_SD_NAMETOINDEX(file_id_hdf, datafield_name)
+sds_id = HDF_SD_SELECT(file_id_hdf, index)
+
+fillvalue_index = HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, fillvalue_index, DATA=fillvalue
+
+scalefactor_index = HDF_SD_ATTRFIND(sds_id, 'scale_factor')
+HDF_SD_ATTRINFO, sds_id, scalefactor_index, DATA=scale_factor
+
+offset_index = HDF_SD_ATTRFIND(sds_id, 'add_offset')
+HDF_SD_ATTRINFO, sds_id, offset_index, DATA=offset
+
+HDF_SD_ENDACCESS, sds_id
+HDF_SD_END, file_id_hdf
+
+; Read lat/lon from [1].
+geo_file_name='VNP03IMG_NRT.A2018064.0524.001.nc'
+file_id = H5F_OPEN(geo_file_name)
+
+lat_name='geolocation_data/latitude'
+lat_id = H5D_OPEN(file_id, lat_name)
+lat = H5D_READ(lat_id)
+H5D_CLOSE, lat_id
+  
+lon_name='geolocation_data/longitude'
+lon_id = H5D_OPEN(file_id, lon_name)
+lon = H5D_READ(lon_id)
+H5D_CLOSE, lon_id
+H5F_CLOSE, file_id
+
+; Process fillvalue.
+idx = WHERE(data EQ fillvalue(0), cnt)
+
+; Convert data type.
+dataf = float(data)
+
+; Apply scale factor and offset
+dataf = scale_factor(0) * (dataf - offset(0)) 
+
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Get max and min value of data for color bar.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+
+; Get min/max value of lat and lon for zoomed image.
+latmin=MIN(lat)
+latmax=MAX(lat)
+lonmin=MIN(lon)
+lonmax=MAX(lon)
+
+
+; Generate a plot.
+; Retrieve dimension size of data.
+dimsize=SIZE(lat,/dim)
+numlat=dimsize(0)
+numlon=dimsize(1)
+
+; Set center point of map.
+c_lon = lon[numlat/2, numlon/2]
+c_lat = lat[numlat/2, numlon/2]
+
+; Get min/max value of lat and lon for zoomed image.
+latmin=MIN(lat)
+latmax=MAX(lat)
+lonmin=MIN(lon)
+lonmax=MAX(lon)
+
+m = MAP('Orthographic', TITLE=file_name, FONT_SIZE=9, /BUFFER, $
+        DIMENSIONS=[800,600], $
+        CENTER_LONGITUDE = c_lon,  CENTER_LATITUDE = c_lat, $
+        LIMIT=[latmin, lonmin, latmax, lonmax])
+ct = COLORTABLE(72, /reverse)
+t1 = TEXT(0.01, 0.05, FONT_SIZE=8, DATAFIELD_NAME)
+lon1 = lon[*]
+lat1 = lat[*]
+dataf1 = dataf[*]
+; Subset for faster processing.
+c1 = SCATTERPLOT(lon1[0:*:10], lat1[0:*:10], OVERPLOT=m, $
+                 MAGNITUDE = dataf1[0:*:10], $
+;c1 = SCATTERPLOT(lon1, lat1, OVERPLOT=m, $
+;                 MAGNITUDE = dataf1, $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+
+; See [2].
+units = 'Reflectance'
+cb = COLORBAR(TARGET=c1, /BORDER, ORIENTATION=1, TEXTPOS=1,$
+              RANGE=[datamin, datamax], POSITION=[0.85,0.2,0.87,0.8], $
+              TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
+
+; References
+; [1] https://cmr.earthdata.nasa.gov/search/concepts/C2105092163-LAADS.html
+; [2] https://viirsland.gsfc.nasa.gov/PDF/VIIRS_Surf_Refl_UserGuide_v1.3.pdf
