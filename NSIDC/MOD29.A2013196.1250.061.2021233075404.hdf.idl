@@ -1,0 +1,116 @@
+;
+;  This example code illustrates how to access and visualize NSIDC
+;  MOD29 L2 HDF-EOS2 Swath file in IDL. 
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+
+; Usage:
+;
+;   $idl MOD29.A2013196.1250.061.2021233075404.hdf.idl
+;
+; Tested under: IDL 8.9.0
+; Last updated: 2024-08-07
+
+; Define file name, swath name, and data field.
+file_name='MOD29.A2013196.1250.061.2021233075404.hdf'
+swath_name='MOD_Swath_Sea_Ice'
+datafield_name='Ice_Surface_Temperature'
+
+; Open file.
+file_id=EOS_SW_OPEN(file_name)
+
+; Attach Swath.
+swath_id=EOS_SW_ATTACH(file_id, swath_name)
+
+; Retrieve data.
+status=EOS_SW_READFIELD(swath_id,datafield_name,data)
+
+; Detach Swath.
+status=EOS_SW_DETACH(swath_id)
+
+; Close file.
+status=EOS_SW_CLOSE(file_id)
+
+; Retrieve units, fill value, valid_range, scale factor, and offset 
+; using HDF4 APIs.
+hdf_file_id=HDF_SD_START(file_name, /READ)
+index=HDF_SD_NAMETOINDEX(hdf_file_id, datafield_name)
+sds_id=HDF_SD_SELECT(hdf_file_id, index)
+units_index=HDF_SD_ATTRFIND(sds_id, 'units')
+HDF_SD_ATTRINFO, sds_id, units_index, DATA=units
+scalefactor_index=HDF_SD_ATTRFIND(sds_id, 'scale_factor')
+HDF_SD_ATTRINFO, sds_id, scalefactor_index, DATA=scale_factor
+offset_index=HDF_SD_ATTRFIND(sds_id, 'add_offset')
+HDF_SD_ATTRINFO, sds_id, offset_index, DATA=offset
+offset_index=HDF_SD_ATTRFIND(sds_id, '_FillValue')
+HDF_SD_ATTRINFO, sds_id, offset_index, DATA=fillvalue
+offset_index=HDF_SD_ATTRFIND(sds_id, 'long_name')
+HDF_SD_ATTRINFO, sds_id, offset_index, DATA=long_name
+valid_range_index=HDF_SD_ATTRFIND(sds_id, 'valid_range')
+HDF_SD_ATTRINFO, sds_id, valid_range_index, data=valid_range
+HDF_SD_END, hdf_file_id
+
+; Retrieve lat/lon.
+; Since dimension maps are used in the MOD29 file, we must use
+; geolocation values that are stored in a secondary file.
+file_name_geo='MOD03.A2013196.1250.061.2017299150213.hdf'
+swath_name= 'MODIS_Swath_Type_GEO'
+file_id = EOS_SW_OPEN(file_name_geo)
+swath_id=EOS_SW_ATTACH(file_id, swath_name)
+
+status=EOS_SW_READFIELD(swath_id,'Longitude',lon)
+status=EOS_SW_READFIELD(swath_id,'Latitude',lat)
+
+status=EOS_SW_DETACH(swath_id)
+status=EOS_SW_CLOSE(file_id)
+
+; Convert data type.
+dataf=float(data)
+
+; Apply scale factor and offset.
+dataf=offset(0)+(scale_factor(0))*dataf
+
+; Process valid_range.
+idx=WHERE(data LT valid_range(0) OR data GT valid_range(1), cnt)
+IF cnt GT 0 THEN dataf[idx] = !Values.F_NAN
+
+; Process fillvalue.
+dataf[WHERE(data EQ fillvalue(0))] = !Values.F_NAN
+
+; Get max and min value of data.
+datamin = MIN(dataf, /NAN)
+datamax = MAX(dataf, /NAN)
+
+; Prepare field name title using long name attribute.
+field = long_name(0)
+
+; Generate the plot.
+latmin=min(lat)
+latmax=max(lat)
+lonmin=min(lon)
+lonmax=max(lon)
+
+m = MAP('Polar Stereographic', $
+        LIMIT=[latmin, lonmin, latmax, lonmax], $
+        CENTER_LATITUDE=90.0, $
+        TITLE=file_name, /BUFFER)
+ct = COLORTABLE(22)
+t1 = TEXT(0.35, 0.01, long_name)
+
+; Subset points to make plotting faster.
+c1 = SCATTERPLOT(lon[0:*:10], lat[0:*:10], OVERPLOT=m, $
+                 MAGNITUDE=dataf[0:*:10], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1, /BUFFER)
+mc = MAPCONTINENTS()
+cb = COLORBAR(RGB_TABLE=ct, RANGE=[datamin, datamax], /BORDER, ORIENTATION=1, TEXTPOS=1, POSITION=[0.85,0.2,0.87,0.8], TITLE=units)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600, WIDTH=800
+EXIT
