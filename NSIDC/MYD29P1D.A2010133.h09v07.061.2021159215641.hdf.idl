@@ -1,0 +1,160 @@
+;
+; This example code illustrates how to access and visualize NSIDC MODIS Grid
+; file in IDL. This file uses LAMAZ projection.
+;
+; If you have any questions, suggestions, comments  on this example, 
+; please use the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+;  If you would like to see an  example of any other NASA HDF/HDF-EOS 
+; data product that is not listed in the HDF-EOS Comprehensive Examples page
+; (http://hdfeos.org/zoo), feel free to contact us at eoshelp@hdfgroup.org
+; or post it at the HDF-EOS Forum (http://hdfeos.org/forums).
+;
+; Usage:
+;
+; $idl MYD29P1D.A2010133.h09v07.061.2021159215641.hdf.idl
+;
+; Tested under: IDL 8.9.0
+; Last updated: 2024-08-09
+
+; Define file name, grid name, and data field.
+FILE_NAME='MYD29P1D.A2010133.h09v07.061.2021159215641.hdf'
+GRID_NAME='MOD_Grid_Seaice_1km'
+DATAFIELD_NAME='Sea_Ice_by_Reflectance'
+
+; This data filed has no unit.
+UNIT='none'
+
+; Open file.
+file_id = EOS_GD_OPEN(FILE_NAME)
+
+; Attach grid.
+grid_id = EOS_GD_ATTACH(file_id, GRID_NAME)
+
+; Retrieve grid info.
+status = EOS_GD_GRIDINFO(grid_id, xdimsize, ydimsize, upleft, lowrgt)
+
+; Retrieve pojection info.
+status = EOS_GD_PROJINFO(grid_id, projcode, zonecode, spherecode, projparam)
+
+; Retrieve data via the EOS_GD interface
+status = EOS_GD_READFIELD(grid_id, DATAFIELD_NAME, data)
+
+; Detach grid.
+status = EOS_GD_DETACH(grid_id)
+
+; Close file.
+status = EOS_GD_CLOSE(file_id)
+
+; Retrieve attributes using HDF_SD_...() routines because they are not
+; accessible through EOS_GD_...() APIs.
+newFileID=HDF_SD_START(FILE_NAME, /READ)
+
+index=HDF_SD_NAMETOINDEX(newFileID, DATAFIELD_NAME)
+
+thisSdsID=HDF_SD_SELECT(newFileID, index)
+
+long_name_index=HDF_SD_ATTRFIND(thisSdsID, 'long_name')
+HDF_SD_ATTRINFO, thisSdsID, long_name_index, DATA=long_name
+
+HDF_SD_END, newFileID
+
+; This file contains Lambert Azimuthal projection. 
+
+; HDF-EOS2 returns 11. 
+projcode = projcode+100
+
+clon = projparam[4]/1000000.0
+clat = projparam[5]/1000000.0
+
+; Please note that /GCTP must be specified.
+mapStruct = MAP_PROJ_INIT(projcode, /GCTP, CENTER_LONGITUDE=clon, $
+                          CENTER_LATITUDE=clat)
+x0 = upleft(0)
+x1 = lowrgt(0)
+y0 = upleft(1)
+y1 = lowrgt(1)
+xinc = (x1 - x0 ) / xdimsize
+yinc = (y1 - y0 ) / ydimsize
+x = FINDGEN(xdimsize)*(xinc)  + x0
+y = FINDGEN(ydimsize)*(yinc)  + y0
+
+; Create mesh.
+xarr = x # Replicate(1, N_Elements(y))
+yarr = Replicate(1, N_Elements(x)) # y
+
+; See MAP_RPOJ_INVERSE IDL reference manual.
+; The function returns (2,n) array of lat/lon.
+result  = MAP_PROJ_INVERSE(xarr, yarr, MAP_STRUCTURE=mapStruct)
+lon1d = result[0,*]
+lat1d = result[1,*]
+
+; Reshape to match the dataset dimension.
+lat=Reform(lat1d,xdimsize,ydimsize)
+lon=Reform(lon1d,xdimsize,ydimsize)
+
+; Check what discrete "Key" values are used to determine color table
+; and discrete color bar.
+data_unique = data[UNIQ(data, SORT(data))]
+PRINT, data_unique
+; You will see 5 different values:  25  37  39  50 200
+dimsize_data_unique = size(data_unique,/dim)
+levels = dimsize_data_unique(0)
+
+;  The following key information for color table is obtained from the 
+; data field's "Key" attribute. You can check it using HDFView.
+; 
+; Key = 0=missing data, 1=no decision, 11=night, 25=land, 37=inland water,
+;       39=ocean, 50=cloud, 200=sea ice, 253=no input tile expected,
+;       254=non-production mask; _FillValue = 255
+
+; Construct a color table based on the following assignment:
+;
+; Key  R  G   B    Name
+; 0   255 255 255  white
+; 1   184 184 184
+; 11  225 225 150
+; 25  0   255 0
+; 37  35  35  117
+; 39  35  35  117
+; 50  100 200 255
+; 200 255 0   0
+; 253 0   0   0
+; 255 0   0   0  black
+;
+; The above assignment is close to "Image Gallery" of NSIDC.
+
+latm = MIN(lat)
+; Generate a plot.
+m = MAP('Lambert Azimuthal', CENTER_LATITUDE=90, $
+        LIMIT = [latm, -180, 90, 180], $
+        TITLE=file_name, /BUFFER)
+
+; Construct color table.
+; [255, 255,  255], $ ;0
+ct = COLORTABLE([[0,   255,  0], $   ;25
+                 [35,  35,   117], $ ;37
+                 [35,  35,   117], $ ;39
+                 [100, 200,  255], $ ;50
+                 [255, 0,    0]], $   ;200
+                NCOLORS = levels, /TRANSPOSE)
+
+FOR i=0,levels-1 DO data[WHERE(data EQ data_unique[i])] = i
+index = FINDGEN(levels)
+c1 = SCATTERPLOT(lon[*], lat[*], OVERPLOT=m, $
+                 MAGNITUDE=data[*], $
+                 RGB_TABLE=ct, $
+                 POSITION=[0.1, 0.1, 0.83, 0.9],$
+                 /SYM_FILLED, SYMBOL='o', SYM_SIZE=0.1)
+mc = MAPCONTINENTS()
+cb = COLORBAR(RGB_TABLE=ct, BORDER=1, RANGE=[0,5], $
+              TICKVALUES=[0.5, 1.5, 2.5, 3.5, 4.5], $
+              TICKNAME=['land', $
+                        'inland water','ocean', 'cloud', 'sea!Cice'], $
+              ORIENTATION=1, TEXTPOS=1,  $
+              Position=[0.9,0.1,0.94,0.8], TITLE=unit)
+t1 = TEXT(0.35, 0.01, long_name)
+png = file_name + '.idl.png'
+c1.save, png, HEIGHT=600
+EXIT
+
